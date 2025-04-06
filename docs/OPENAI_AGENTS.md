@@ -34,10 +34,10 @@ Models
 
 Large language models (LLMs) are at the core of many agentic systems, responsible for making decisions and interacting with the world. OpenAI’s models support a wide range of capabilities:
 
-*   **High intelligence:** Capable of [reasoning](/docs/guides/reasoning) and planning to tackle the most difficult tasks.
-*   **Tools:** [Call your functions](/docs/guides/function-calling) and leverage OpenAI's [built-in tools](/docs/guides/tools).
-*   **Multimodality:** Natively understand text, images, audio, code, and documents.
-*   **Low-latency:** Support for [real-time audio](/docs/guides/realtime) conversations and smaller, faster models.
+* **High intelligence:** Capable of [reasoning](/docs/guides/reasoning) and planning to tackle the most difficult tasks.
+* **Tools:** [Call your functions](/docs/guides/function-calling) and leverage OpenAI's [built-in tools](/docs/guides/tools).
+* **Multimodality:** Natively understand text, images, audio, code, and documents.
+* **Low-latency:** Support for [real-time audio](/docs/guides/realtime) conversations and smaller, faster models.
 
 For detailed model comparisons, visit the [models](/docs/models) page.
 

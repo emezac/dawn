@@ -37,7 +37,7 @@ Open a PowerShell or Command Prompt as an administrator and run wsl --install.
 Restart your computer.
 Open the WSL application.
 In the WSL terminal, cd into the appropriate directory (e.g., cd /mnt/c/Users/Myself/my/code/) and then run the following commands:
-curl -fsSL https://docs.grit.io/install | bash
+curl -fsSL <https://docs.grit.io/install> | bash
 grit install
 grit apply openai
 Then, you can close WSL and go back to using Windows.
@@ -48,12 +48,15 @@ If your Jupyter notebooks are not in source control, they will be more difficult
 If you need to migrate in a way that preserves use of the module-level client instead of instantiated clients, you can use the openai_global grit migration instead.
 
 Initialization
+
 # old
+
 import openai
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 
 # new
+
 from openai import OpenAI
 
 client = OpenAI(
@@ -63,6 +66,7 @@ Responses
 Response objects are now pydantic models and no longer conform to the dictionary shape. However you can easily convert them to a dictionary with model.model_dump().
 
 # before
+
 import json
 import openai
 
@@ -72,6 +76,7 @@ print(completion.get('usage'))
 print(json.dumps(completion, indent=2))
 
 # after
+
 from openai import OpenAI
 
 client = OpenAI()
@@ -86,11 +91,13 @@ We do not support calling asynchronous methods in the module-level client, inste
 The rest of the API is exactly the same as the synchronous client.
 
 # old
+
 import openai
 
 completion = openai.ChatCompletion.acreate(model="gpt-3.5-turbo", messages=[{"role": "user", "content": "Hello world"}])
 
 # new
+
 from openai import AsyncOpenAI
 
 client = AsyncOpenAI()
@@ -105,9 +112,11 @@ We also expose a global client instance that is accessible in a similar fashion 
 import openai
 
 # optional; defaults to `os.environ['OPENAI_API_KEY']`
+
 openai.api_key = '...'
 
 # all client options can be configured just like the `OpenAI` instantiation counterpart
+
 openai.base_url = "https://..."
 openai.default_headers = {"x-foo": "true"}
 
@@ -156,11 +165,12 @@ won't always be correct.
 from openai import AzureOpenAI
 
 # gets the API Key from environment variable AZURE_OPENAI_API_KEY
+
 client = AzureOpenAI(
-    # https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#rest-api-versioning
+    # <https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#rest-api-versioning>
     api_version="2023-07-01-preview",
-    # https://learn.microsoft.com/en-us/azure/cognitive-services/openai/how-to/create-resource?pivots=web-portal#create-a-resource
-    azure_endpoint="https://example-endpoint.openai.azure.com",
+    # <https://learn.microsoft.com/en-us/azure/cognitive-services/openai/how-to/create-resource?pivots=web-portal#create-a-resource>
+    azure_endpoint="<https://example-endpoint.openai.azure.com>",
 )
 
 completion = client.chat.completions.create(

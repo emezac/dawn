@@ -118,3 +118,69 @@ Develop an executable Python script demonstrating a simple agent using a basic W
 - [x] *(Optional)* Organize code into folders (e.g., `core/`, `tools/`, `examples/`).
 
 🚀 **MVP Ready!** The code demonstrates the core concept of a dynamic WMS.
+
+# 🧠 TODO List - Sprint Expansion (2 Weeks)
+
+**Sprint Objective:**  
+Enhance the AI Agent Framework by integrating Web Search and File Read (RAG) capabilities using OpenAI's new tools. This will extend the framework's ability to access and utilize external data sources, improving the agent's contextual understanding and response generation.
+
+---
+
+## 📅 Week 1: Web Search Tool Integration
+
+### ✅ Day 1: Research and Setup
+
+- [x] Review OpenAI's documentation on the Web Search tool.
+- [x] Set up any necessary API configurations or permissions.
+
+### ✅ Day 2-3: Web Search Tool Development
+
+- [x] Implement a new tool interface for Web Search.
+- [x] Create a function to perform web searches and return results.
+- [x] Integrate the Web Search tool into the existing tool registry.
+
+### ✅ Day 4: Testing and Debugging
+
+- [x] Write unit tests for the Web Search tool.
+- [x] Conduct manual testing to ensure accurate and relevant search results.
+
+### ✅ Day 5: Documentation
+
+- [x] Update the documentation to include usage instructions for the Web Search tool.
+- [x] Provide examples of how to use the tool within a workflow.
+
+---
+
+## 📅 Week 2: File Read (RAG) Tool Integration
+
+### ✅ Day 6: Research and Setup
+
+- [ ] Review OpenAI's documentation on File Read (RAG) capabilities.
+- [ ] Set up any necessary API configurations or permissions.
+
+### ✅ Day 7-8: File Read Tool Development
+
+- [ ] Implement a new tool interface for File Read (RAG).
+- [ ] Create a function to read and process file contents for context.
+- [ ] Integrate the File Read tool into the existing tool registry.
+
+### ✅ Day 9: Testing and Debugging
+
+- [ ] Write unit tests for the File Read tool.
+- [ ] Conduct manual testing to ensure correct file reading and context extraction.
+
+### ✅ Day 10: Documentation and Finalization
+
+- [ ] Update the documentation to include usage instructions for the File Read tool.
+- [ ] Provide examples of how to use the tool within a workflow.
+- [ ] Review and finalize all documentation and code changes.
+
+---
+
+## Additional Tasks
+
+- [ ] Review and update the PRD to reflect the new tool capabilities.
+- [ ] Ensure all new features are covered by tests and documentation.
+- [ ] Conduct a code review to ensure quality and consistency.
+
+🚀 **Sprint Goal:** Successfully integrate Web Search and File Read (RAG) tools into the AI Agent Framework, enhancing its ability to access and utilize external data sources.

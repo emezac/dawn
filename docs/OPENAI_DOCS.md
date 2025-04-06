@@ -59,7 +59,7 @@ Responses starter app
 
 Start building with the Responses API
 
-](https://github.com/openai/openai-responses-starter-app)[
+](<https://github.com/openai/openai-responses-starter-app)[>
 
 Text generation and prompting
 
@@ -67,7 +67,6 @@ Learn more about prompting, message roles, and building conversational apps.
 
 ](/docs/guides/text)  
   
-
 Analyze image inputs
 --------------------
 
@@ -153,7 +152,6 @@ Learn to use image inputs to the model and extract meaning from images.
 
 ](/docs/guides/images)  
   
-
 Extend the model with tools
 ---------------------------
 
@@ -212,7 +210,6 @@ Learn to enable the model to call your own custom code.
 
 ](/docs/guides/function-calling)  
   
-
 Deliver blazing fast AI experiences
 -----------------------------------
 
@@ -273,7 +270,6 @@ Use WebRTC or WebSockets for super fast speech-to-speech AI apps.
 
 ](/docs/guides/realtime)  
   
-
 Build agents
 ------------
 
@@ -317,7 +313,6 @@ Learn how to use the OpenAI platform to build powerful, capable AI agents.
 
 ](/docs/guides/agents)  
   
-
 Explore further
 ---------------
 
@@ -359,7 +354,7 @@ Responses starter app
 
 Start building with the Responses API
 
-](https://github.com/openai/openai-responses-starter-app)[
+](<https://github.com/openai/openai-responses-starter-app)[>
 
 Build agents
 

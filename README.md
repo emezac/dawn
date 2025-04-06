@@ -20,24 +20,32 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
   - Easy integration of custom tools.
   - Example tools include a calculator for arithmetic operations.
 
+- **Web Search Tool:**
+  - Allows models to search the web for the latest information.
+  - Configured in the `tools` array of an API request.
+  - Supports user location and search context size customization.
+
 - **Observability:**
   - Logging and tracing to support debugging and workflow analysis.
 
 ## Installation
 
 1. **Clone the Repository:**
+
    ```bash
    git clone <repository-url>
    cd <repository-directory>
    ```
 
 2. **Set Up Virtual Environment:**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
    ```
 
 3. **Install Dependencies:**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -45,6 +53,7 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
 4. **Set Up Environment Variables:**
    - Create a `.env` file in the root directory.
    - Add your OpenAI API key:
+
      ```
      OPENAI_API_KEY=your_openai_api_key
      ```
@@ -52,6 +61,7 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
 ## Usage
 
 1. **Run the Example Workflow:**
+
    ```bash
    python examples/simple_workflow.py
    ```
@@ -61,12 +71,16 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
    - Define workflows using the `Workflow` class.
    - Use the `Agent` class to load and run workflows.
 
+3. **Integrate Web Search Tool:**
+   - Use the Web Search tool to enhance your agent's ability to access real-time information.
+   - Configure the tool in the `tools` array of your API requests.
+
 ## Key Concepts
 
 - **Task:** Represents a unit of work with attributes like `id`, `name`, `status`, `input_data`, `output_data`, `is_llm_task`, and `tool_name`.
 - **Workflow:** A collection of tasks with a defined execution order and logic.
 - **Agent:** Manages workflows, LLM interfaces, and tool registries, providing methods to run workflows and get results.
-- **Tool Interface:** Allows for the registration and execution of custom tools.
+- **Tool Interface:** Allows for the registration and execution of custom tools, including the Web Search tool.
 
 ## Development Plan
 
@@ -83,60 +97,3 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Contact
 
 For questions or feedback, please contact Enrique Meza C: emezac at [gmail.com]
-
-# Project Title
-
-## Overview
-
-This project demonstrates how to use the OpenAI API to build agentic AI applications. It includes examples of workflows that utilize OpenAI's language models.
-
-## Setup
-
-1. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Environment Variables**:
-   Ensure you have the `OPENAI_API_KEY` set in your environment. You can do this by creating a `.env` file in the root of your project with the following content:
-   ```
-   OPENAI_API_KEY=your-api-key-here
-   ```
-
-3. **Run the Example**:
-   To run the example workflow, execute the following command:
-   ```bash
-   python examples/simple_workflow.py
-   ```
-
-## Usage
-
-The project uses the OpenAI SDK to interact with language models. Here's a brief overview of how to use the SDK in this project:
-
-- **Instantiate the OpenAI Client**:
-  ```python
-  from openai import OpenAI
-
-  client = OpenAI(api_key="your-api-key")
-  ```
-
-- **Make API Calls**:
-  Use the client instance to make API calls:
-  ```python
-  response = client.chat.completions.create(
-      model="gpt-3.5-turbo",
-      messages=[
-          {"role": "system", "content": "You are a helpful assistant."},
-          {"role": "user", "content": "Hello, how can I help you today?"}
-      ],
-      max_tokens=150
-  )
-  print(response.choices[0].message.content.strip())
-  ```
-
-## Documentation
-
-For more detailed information, refer to the following documents:
-- [OpenAI SDK Documentation](docs/OPENAI_SDK.md)
-- [Migration Guide](docs/MIGRATE_OPENAI.md)
-- [OpenAI Agents Documentation](docs/OPENAI_AGENTS.md)

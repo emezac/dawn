@@ -8,14 +8,15 @@ Este documento describe el plan para desarrollar un nuevo framework de código a
 
 - **Complejidad Actual:** El desarrollo de agentes AI, aunque avanza rápidamente, sigue siendo complejo. Integrar LLMs, herramientas externas, gestión de estado y lógica de control requiere un esfuerzo considerable.
 - **Simplificación Necesaria:** Existe una demanda clara (evidenciada por lanzamientos de nuevas APIs/SDKs) de herramientas que abstraigan parte de esta complejidad y ofrezcan una experiencia de desarrollo más sencilla.
-- **Gestión de Flujo de Trabajo Limitada:** Muchos frameworks básicos carecen de un sistema sofisticado y explícito para gestionar flujos de trabajo complejos. 
+- **Gestión de Flujo de Trabajo Limitada:** Muchos frameworks básicos carecen de un sistema sofisticado y explícito para gestionar flujos de trabajo complejos.
 - **Oportunidad:** Implementar un sistema de gestión de flujo de trabajo estructurado y dinámico puede aportar un valor significativo, haciendo los agentes más resilientes y capaces de manejar tareas de varios pasos con incertidumbre.
 
 ## 3. Metas y Objetivos del Proyecto
 
 **Meta Principal:** Crear un framework Python intuitivo y modular para construir agentes AI.
 
-### Objetivos Clave:
+### Objetivos Clave
+
 1. **Sistema de Gestión de Flujo de Trabajo (WMS):**
    - Representación explícita de tareas (estado, dependencias, herramientas, resultados esperados).
    - Definición de flujos de trabajo (secuenciales, paralelos, condicionales).
@@ -38,7 +39,8 @@ Este documento describe el plan para desarrollar un nuevo framework de código a
 
 ## 4. Alcance del Proyecto (Versión Inicial v1.0)
 
-### Incluido:
+### Incluido
+
 - Núcleo en Python.
 - Implementación del WMS.
 - Interfaz LLM (solicitud/respuesta + herramientas).
@@ -48,7 +50,8 @@ Este documento describe el plan para desarrollar un nuevo framework de código a
 - Documentación inicial.
 - Pruebas unitarias.
 
-### Excluido (Consideraciones Futuras):
+### Excluido (Consideraciones Futuras)
+
 - Orquestación multi-agente compleja.
 - Optimización ML.
 - GUI.
@@ -60,9 +63,11 @@ Este documento describe el plan para desarrollar un nuevo framework de código a
 ## 5. Características Clave Detalladas
 
 ### Core del Agente
+
 - Clase base con estado, configuración y ciclo de vida.
 
 ### Workflow Management System (WMS)
+
 - **Tareas:** `Task` con `id`, `status`, `dependencies`, `tool_required`, `retry_count`, etc.
 - **Workflow:** Representado como grafo dirigido (listas/diccionarios o `networkx`).
 - **Motor de Ejecución:** Itera tareas, verifica dependencias, ejecuta.
@@ -70,12 +75,15 @@ Este documento describe el plan para desarrollar un nuevo framework de código a
 - **Seguimiento de Estado:** Control del estado del flujo.
 
 ### Interfaz LLM
+
 - Abstracción para enviar prompts, recibir respuestas y hacer llamadas a herramientas.
 
 ### Interfaz de Herramientas
+
 - Registro de herramientas con descripción y función ejecutable.
 
 ### Observabilidad
+
 - Logging en puntos clave: inicio/fin, estado, decisiones, uso de herramientas.
 
 ## 6. Enfoque Técnico
@@ -89,6 +97,7 @@ Este documento describe el plan para desarrollar un nuevo framework de código a
 ## 7. Fases de Desarrollo y Hoja de Ruta (Roadmap)
 
 ### Fase 1: Fundación y Núcleo (4–6 semanas)
+
 - Definir clases base: `Agent`, `Task`, `Workflow`.
 - Implementar WMS básico.
 - Interfaz LLM (OpenAI Chat Completions).
@@ -98,6 +107,7 @@ Este documento describe el plan para desarrollar un nuevo framework de código a
 **Hito:** Agente mínimo que ejecuta un flujo simple.
 
 ### Fase 2: WMS Dinámico e Integración (6–8 semanas)
+
 - WMS completo: dependencias, condicionales, reintentos, feedback.
 - Registro y ejecución de herramientas.
 - Herramientas reales simples.
@@ -108,6 +118,7 @@ Este documento describe el plan para desarrollar un nuevo framework de código a
 **Hito:** Agente ejecuta workflows condicionales y usa herramientas reales.
 
 ### Fase 3: Refinamiento y Lanzamiento (4–6 semanas)
+
 - Refinar APIs.
 - Documentación completa.
 - Mejorar pruebas.

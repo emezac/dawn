@@ -15,7 +15,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 
 **Main Goal:** Create an intuitive and modular Python framework for building AI agents.
 
-### Key Objectives:
+### Key Objectives
 
 1. **Workflow Management System (WMS):**
    - Explicit task representation (state, dependencies, tools, expected results).
@@ -39,7 +39,8 @@ This document outlines the plan to develop a new open-source Python framework fo
 
 ## 4. Project Scope (Initial Version v1.0)
 
-### Included:
+### Included
+
 - Core Python framework (base classes for Agent, Task, Workflow).
 - WMS implementation with described features.
 - LLM interface (request/response pattern with function/tool calling).
@@ -49,7 +50,8 @@ This document outlines the plan to develop a new open-source Python framework fo
 - Fundamental documentation (installation, basic concepts, simple tutorial).
 - Unit tests for core components.
 
-### Excluded (Future Considerations):
+### Excluded (Future Considerations)
+
 - Complex multi-agent orchestration (beyond modular agent calls).
 - ML-based workflow optimization.
 - Graphical User Interface (GUI).
@@ -61,9 +63,11 @@ This document outlines the plan to develop a new open-source Python framework fo
 ## 5. Key Features in Detail
 
 ### Agent Core
+
 - Base class encapsulating state, configuration, and main lifecycle.
 
 ### Workflow Management System (WMS)
+
 - **Task Representation:** Classes or dicts for tasks with attributes like `id`, `name`, `status` (`pending`, `running`, `completed`, `failed`, `skipped`), `dependencies`, `tool_required`, `input_data`, `output_data`, `retry_count`, `max_retries`.
 - **Workflow Definition:** Represented as a directed graph (initially using lists/dicts or a library like `networkx`).
 - **Execution Engine:** Iterates over tasks, checks dependencies, manages state, executes via LLM or tool.
@@ -71,17 +75,27 @@ This document outlines the plan to develop a new open-source Python framework fo
 - **State Tracking:** Maintains current state of tasks and overall workflow.
 
 ### LLM Interface
+
 - Abstraction for sending prompts and receiving responses, handling function/tool calling logic.
 - Configurable for different providers/models.
 
 ### Tool Interface
+
 - Registry of tools with descriptions and executable functions in Python.
 - **Example Tool: Calculate**
   - **Function Signature**: `calculate(operation: str, a: float, b: float) -> float`
   - **Description**: Performs basic arithmetic operations (add, subtract, multiply, divide) on two numbers.
   - **Usage**: The tool is registered with the agent and can be called within a workflow to perform calculations.
 
+### Web Search Tool
+
+- **Purpose**: Allows models to search the web for the latest information before generating a response.
+- **Integration**: Configured in the `tools` array of an API request. The model can choose to use the web search based on the input prompt.
+- **Output**: Includes web search call details and message content with inline citations for URLs.
+- **Customization**: Supports user location specification and search context size adjustments.
+
 ### Observability
+
 - Logging hooks at key points (task start/end, state change, tool call, WMS decision) for detailed tracing.
 
 ## 6. Technical Approach
@@ -97,6 +111,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 ## 7. Development Phases and Roadmap
 
 ### Phase 1: Foundation and Core (Estimated 4–6 weeks)
+
 - Develop base classes: `Agent`, `Task`, `Workflow`.
 - Implement basic WMS structure (simple sequential workflow).
 - Build initial LLM interface (e.g., OpenAI Chat Completions with function calling).
@@ -106,6 +121,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 **Milestone:** Minimal agent executes a predefined simple workflow using an LLM and mock tool.
 
 ### Phase 2: Dynamic WMS and Tool Integration (Estimated 6–8 weeks)
+
 - Full WMS logic: dependencies, conditionals, retries, feedback.
 - Tool registration and execution interface.
 - 1–2 real tools (e.g., calculator, basic web search).
@@ -116,6 +132,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 **Milestone:** Agent executes workflow with conditionals, retries failed tasks, uses external tools, and adjusts plans based on intermediate results.
 
 ### Phase 3: Refinement, Documentation, and Release (Estimated 4–6 weeks)
+
 - Refine framework APIs based on usage and testing.
 - Write complete documentation: installation guide, key concepts, tutorials, advanced examples.
 - Improve test coverage.
