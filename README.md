@@ -83,3 +83,60 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Contact
 
 For questions or feedback, please contact Enrique Meza C: emezac at [gmail.com]
+
+# Project Title
+
+## Overview
+
+This project demonstrates how to use the OpenAI API to build agentic AI applications. It includes examples of workflows that utilize OpenAI's language models.
+
+## Setup
+
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Environment Variables**:
+   Ensure you have the `OPENAI_API_KEY` set in your environment. You can do this by creating a `.env` file in the root of your project with the following content:
+   ```
+   OPENAI_API_KEY=your-api-key-here
+   ```
+
+3. **Run the Example**:
+   To run the example workflow, execute the following command:
+   ```bash
+   python examples/simple_workflow.py
+   ```
+
+## Usage
+
+The project uses the OpenAI SDK to interact with language models. Here's a brief overview of how to use the SDK in this project:
+
+- **Instantiate the OpenAI Client**:
+  ```python
+  from openai import OpenAI
+
+  client = OpenAI(api_key="your-api-key")
+  ```
+
+- **Make API Calls**:
+  Use the client instance to make API calls:
+  ```python
+  response = client.chat.completions.create(
+      model="gpt-3.5-turbo",
+      messages=[
+          {"role": "system", "content": "You are a helpful assistant."},
+          {"role": "user", "content": "Hello, how can I help you today?"}
+      ],
+      max_tokens=150
+  )
+  print(response.choices[0].message.content.strip())
+  ```
+
+## Documentation
+
+For more detailed information, refer to the following documents:
+- [OpenAI SDK Documentation](docs/OPENAI_SDK.md)
+- [Migration Guide](docs/MIGRATE_OPENAI.md)
+- [OpenAI Agents Documentation](docs/OPENAI_AGENTS.md)
