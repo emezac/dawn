@@ -1,0 +1,246 @@
+Metadata-Version: 2.4
+Name: ai_agent_framework
+Version: 0.1.0
+Summary: Un framework de Python para crear agentes de Inteligencia Artificial con gestión dinámica de flujo de trabajo
+Home-page: https://github.com/example/ai-agent-framework
+Author: AI Agent Framework Team
+Author-email: example@example.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: openai>=1.0.0
+Requires-Dist: python-dotenv>=1.0.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# AI Agent Framework
+
+Un framework de Python para crear agentes de Inteligencia Artificial con gestión dinámica de flujo de trabajo.
+
+## Descripción
+
+AI Agent Framework es una biblioteca de código abierto que simplifica el desarrollo de aplicaciones agénticas en Python. Su característica distintiva es un Sistema de Gestión de Flujo de Trabajo (WMS) robusto y explícito que permite a los agentes:
+
+- Descomponer tareas complejas
+- Ejecutar sub-tareas secuenciales o condicionales
+- Evaluar resultados (feedback)
+- Ajustar dinámicamente el plan de acción
+
+Este framework está diseñado para ser modular, extensible y fácil de usar, permitiendo a los desarrolladores crear agentes AI potentes con un esfuerzo mínimo.
+
+## Características
+
+- **Sistema de Gestión de Flujo de Trabajo (WMS)**: Define, ejecuta y monitoriza flujos de trabajo complejos
+- **Integración con LLM**: Conecta fácilmente con APIs de modelos de lenguaje como OpenAI
+- **Sistema de Herramientas**: Mecanismo para definir y registrar herramientas personalizadas
+- **Flujo Dinámico**: Lógica condicional, paso de datos entre tareas y sistema de reintentos
+- **Observabilidad**: Logging básico para seguimiento del flujo de trabajo
+
+## Instalación
+
+```bash
+# Clonar el repositorio
+git clone https://github.com/tu-usuario/ai-agent-framework.git
+cd ai-agent-framework
+
+# Crear un entorno virtual (opcional pero recomendado)
+python -m venv venv
+source venv/bin/activate  # En Windows: venv\Scripts\activate
+
+# Instalar dependencias
+pip install -r requirements.txt
+```
+
+## Configuración
+
+Crea un archivo `.env` en la raíz del proyecto con tu clave API de OpenAI:
+
+```
+OPENAI_API_KEY=tu-clave-api-aquí
+```
+
+## Uso Básico
+
+### Crear un Agente Simple
+
+```python
+from core.agent import Agent
+from core.task import Task
+from core.workflow import Workflow
+from tools.basic_tools import calculate
+
+# Crear un agente
+agent = Agent(
+    agent_id="mi_agente",
+    name="Mi Agente"
+)
+
+# Registrar herramientas
+agent.register_tool("calculate", calculate)
+
+# Crear un workflow
+workflow = Workflow(
+    workflow_id="mi_workflow",
+    name="Mi Workflow"
+)
+
+# Crear tareas
+task1 = Task(
+    task_id="tarea1",
+    name="Generar Idea",
+    is_llm_task=True,
+    input_data={
+        "prompt": "Genera una idea para un proyecto de ciencia de datos."
+    }
+)
+
+task2 = Task(
+    task_id="tarea2",
+    name="Calcular Complejidad",
+    is_llm_task=False,
+    tool_name="calculate",
+    input_data={
+        "operation": "multiply",
+        "a": 2,
+        "b": 3
+    }
+)
+
+# Añadir tareas al workflow
+workflow.add_task(task1)
+workflow.add_task(task2)
+
+# Cargar workflow en el agente
+agent.load_workflow(workflow)
+
+# Ejecutar el workflow
+results = agent.run()
+
+# Imprimir resultados
+print(f"Estado del workflow: {results['status']}")
+for task_id, task_data in results['tasks'].items():
+    print(f"\nTarea: {task_data['name']}")
+    print(f"Estado: {task_data['status']}")
+    if 'output_data' in task_data and 'response' in task_data['output_data']:
+        print(f"Resultado: {task_data['output_data']['response']}")
+```
+
+### Flujo Condicional y Paso de Datos
+
+```python
+# Crear tareas con dependencias y condiciones
+task1 = Task(
+    task_id="generar_tema",
+    name="Generar Tema",
+    is_llm_task=True,
+    input_data={
+        "prompt": "Genera un tema para un artículo de blog."
+    }
+)
+
+task2 = Task(
+    task_id="verificar_longitud",
+    name="Verificar Longitud",
+    is_llm_task=False,
+    tool_name="check_length",
+    input_data={
+        "text": "${generar_tema}.output_data.response",
+        "min_length": 5
+    }
+)
+
+task3a = Task(
+    task_id="tema_ok",
+    name="Tema Aceptado",
+    is_llm_task=True,
+    input_data={
+        "prompt": "Desarrolla un esquema para un artículo sobre: ${generar_tema}.output_data.response"
+    }
+)
+
+task3b = Task(
+    task_id="regenerar_tema",
+    name="Regenerar Tema",
+    is_llm_task=True,
+    input_data={
+        "prompt": "El tema generado es demasiado corto. Por favor, genera un tema más descriptivo para un artículo de blog."
+    },
+    next_task_id_on_success="verificar_longitud"  # Volver a verificar después de regenerar
+)
+
+# Configurar lógica condicional
+task2.next_task_id_on_success = "tema_ok"  # Si la longitud es adecuada
+task2.next_task_id_on_failure = "regenerar_tema"  # Si la longitud es insuficiente
+```
+
+## Estructura del Framework
+
+El framework está organizado en los siguientes módulos:
+
+- **core/**: Componentes principales del framework
+  - **task.py**: Definición de la clase Task
+  - **workflow.py**: Definición de la clase Workflow
+  - **agent.py**: Definición de la clase Agent
+  - **engine.py**: Motor de ejecución del WMS
+- **llm/**: Integración con modelos de lenguaje
+  - **interface.py**: Interfaz para interactuar con LLMs
+- **tools/**: Sistema de herramientas
+  - **registry.py**: Registro de herramientas
+  - **basic_tools.py**: Implementación de herramientas básicas
+- **utils/**: Utilidades
+  - **logger.py**: Funciones de logging
+- **examples/**: Ejemplos de uso
+  - **simple_workflow.py**: Ejemplo de un workflow simple
+
+## Ejemplos
+
+Consulta el directorio `examples/` para ver ejemplos completos de uso del framework:
+
+```bash
+# Ejecutar el ejemplo de workflow simple
+python -m examples.simple_workflow
+```
+
+## Desarrollo
+
+### Ejecutar Pruebas
+
+```bash
+# Ejecutar todas las pruebas
+python -m unittest discover tests
+
+# Ejecutar pruebas específicas
+python -m unittest tests.test_task
+python -m unittest tests.test_workflow
+```
+
+## Contribuir
+
+Las contribuciones son bienvenidas. Por favor, sigue estos pasos:
+
+1. Haz fork del repositorio
+2. Crea una rama para tu característica (`git checkout -b feature/amazing-feature`)
+3. Haz commit de tus cambios (`git commit -m 'Add some amazing feature'`)
+4. Haz push a la rama (`git push origin feature/amazing-feature`)
+5. Abre un Pull Request
+
+## Licencia
+
+Este proyecto está licenciado bajo la Licencia MIT - ver el archivo LICENSE para más detalles.
+
+## Contacto
+
+Tu Nombre - [@tu_twitter](https://twitter.com/tu_twitter) - email@ejemplo.com
+
+Link del Proyecto: [https://github.com/tu-usuario/ai-agent-framework](https://github.com/tu-usuario/ai-agent-framework)
