@@ -8,6 +8,7 @@ that use both LLM and tools, and how to execute it with an agent.
 import os
 import sys
 from dotenv import load_dotenv
+from openai import OpenAI
 
 # Add parent directory to path to import the framework
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,6 +21,26 @@ from tools.basic_tools import calculate, check_length
 # Load environment variables from .env file
 load_dotenv()
 
+# Instantiate the OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def call_openai(prompt):
+    """Helper function to call OpenAI API."""
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=150
+    )
+    return response.choices[0].message.content.strip()
+
+def execute_llm_task(task):
+    """Execute a task that requires LLM processing."""
+    prompt = task.input_data["prompt"]
+    response = call_openai(prompt)
+    task.output_data = {"response": response}
 
 def main():
     """Run a simple example workflow."""
@@ -29,7 +50,6 @@ def main():
     agent = Agent(
         agent_id="example_agent",
         name="Example Agent",
-        # API key will be loaded from OPENAI_API_KEY environment variable
     )
     
     # Register tools
@@ -134,14 +154,16 @@ def main():
     # Set up conditional logic
     task3.next_task_id_on_success = "calculate_metrics"  # Default path if length is OK
     
-    # If email is too short (min_length check fails)
-    # We need to check this in the workflow execution
-    
     # Load workflow into agent
     agent.load_workflow(workflow)
     
     # Run the workflow
     results = agent.run()
+    
+    # Execute LLM tasks
+    for task_id, task in workflow.tasks.items():
+        if task.is_llm_task:
+            execute_llm_task(task)
     
     # Print results
     print("\nWorkflow Results:")
