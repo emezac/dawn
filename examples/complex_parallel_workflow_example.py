@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from core.task import Task
 from core.workflow import Workflow
 from core.agent import Agent
-from core.tools.registry import ToolRegistry # Import your actual ToolRegistry
+from core.tools.registry import ToolRegistry
+from core.utils.visualizer import visualize_workflow 
 
 
 def main():
@@ -147,6 +148,13 @@ def main():
     except Exception as e:
         print(f"FATAL: Error adding tasks to workflow: {e}")
         return
+    
+    # --- Visualize the Workflow ---
+    print("\nGenerating workflow visualization...")
+    # Save the graph in the 'output' directory with a specific name
+    viz_filename = os.path.join(output_dir, f"{workflow.id}_graph")
+    visualize_workflow(workflow, filename=viz_filename, format='pdf', view=False) # Set view=True to auto-open
+    print("-" * 30)
 
     # --- Load and run ---
     agent.load_workflow(workflow)

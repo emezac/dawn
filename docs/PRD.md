@@ -23,6 +23,7 @@ This document outlines the plan to develop a new open-source Python framework fo
    - Monitored task execution.
    - Feedback integration for decision-making (retry, skip, adjust, generate new tasks).
    - Workflow state tracking.
+   - **Visualization of Workflow Execution:** Generate visual representations of workflows to aid in understanding and debugging.
 
 2. **Simple Interface for LLMs:**
    - Compatibility with popular APIs (OpenAI, Anthropic, etc.).
@@ -47,6 +48,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - Mechanism to define and register custom tools.
 - Basic tool examples (e.g., calculator, web search mock).
 - Basic logging system for workflow tracing.
+- **Visualization of Workflow Execution:** Using Graphviz to create visual representations of workflows.
 - Fundamental documentation (installation, basic concepts, simple tutorial).
 - Unit tests for core components.
 
@@ -73,6 +75,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - **Execution Engine:** Iterates over tasks, checks dependencies, manages state, executes via LLM or tool.
 - **Feedback Handler:** Interprets task results and decides next actions (continue, retry, fail, activate condition).
 - **State Tracking:** Maintains current state of tasks and overall workflow.
+- **Visualization:** Generate visual representations of workflows using Graphviz to aid in understanding and debugging.
 
 ### LLM Interface
 
@@ -137,6 +140,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - 1–2 real tools (e.g., calculator, basic web search).
 - Refine LLM interface to better support tool workflows.
 - Add more observability/logging.
+- **Visualization of Workflows:** Implement visualization using Graphviz.
 - Write tests for WMS and tool integration.
 
 **Milestone:** Agent executes workflow with conditionals, retries failed tasks, uses external tools, and adjusts plans based on intermediate results.

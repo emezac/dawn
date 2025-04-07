@@ -1,11 +1,12 @@
 # AI Agent Framework
 
-The AI Agent Framework is designed to enhance the capabilities of AI agents, allowing them to perform tasks such as web searching, file reading, file uploading, and markdown file creation. Recent updates include support for conditional workflows and enhancements to the web search tool.
+The AI Agent Framework is designed to enhance the capabilities of AI agents, allowing them to perform tasks such as web searching, file reading, file uploading, and markdown file creation. Recent updates include support for conditional workflows, enhancements to the web search tool, and the ability to visualize workflow execution.
 
 ## Features
 
 - **Conditional Workflows**: Enable dynamic task execution based on specific conditions or task outcomes, enhancing flexibility and adaptability.
 - **Web Search Tool**: Updated to use the latest model version with improved performance and reliability.
+- **Visualization of Workflow Execution**: Generate visual representations of workflows to aid in understanding and debugging.
 
 ## Usage
 
@@ -48,6 +49,19 @@ input_data = {
 result = registry.execute_tool("web_search", input_data)
 ```
 
+### Visualization of Workflow Execution
+
+The framework supports generating visual representations of workflows using Graphviz, which helps in understanding and debugging complex workflows.
+
+#### Usage Example
+
+```python
+from core.utils.visualizer import visualize_workflow
+
+# Assuming 'workflow' is an instance of the Workflow class
+visualize_workflow(workflow, filename="workflow_graph", format='pdf', view=True)
+```
+
 ## Examples
 
 - **Complex Conditional Workflow**: `examples/complex_conditional_workflow.py`
@@ -65,6 +79,7 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
   - Definition of workflows (sequential, parallel, conditional).
   - Monitored task execution with feedback integration for decision-making.
   - Workflow state tracking.
+  - **Visualization of Workflow Execution:** Generate visual representations of workflows to aid in understanding and debugging.
 
 - **LLM Interface:**
   - Compatibility with popular APIs (e.g., OpenAI).
@@ -128,6 +143,9 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
 3. **Integrate Web Search Tool:**
    - Use the Web Search tool to enhance your agent's ability to access real-time information.
    - Configure the tool in the `tools` array of your API requests.
+
+4. **Visualize Workflow Execution:**
+   - Use the `visualize_workflow` function to generate visual representations of your workflows.
 
 ## Key Concepts
 
