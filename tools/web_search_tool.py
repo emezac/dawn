@@ -19,10 +19,12 @@ class WebSearchTool:
 
         try:
             response = self.client.responses.create(
-                model="gpt-4o",
-                tools=tools_config,
-                input=query
+                model="gpt-4o-2024-08-06",
+                input=query,
+                tools=[{"type": "web_search_preview", "search_context_size": context_size}],
+                timeout=30  # timeout after 30 seconds
             )
+
             print("Received response:", response)
             # Extract the text from the response
             output_message = next((output for output in response.output if output.type == 'message'), None)

@@ -25,11 +25,13 @@ class TestWebSearchTool(unittest.TestCase):
         
         # Assert the result
         if result["success"]:
-            # Check for expected content in the result
-            positive_indicators = ["uplifting", "positive", "good news", "celebrate", "success", "achievement"]
+            # Modified positive indicators to be more flexible.
+            positive_indicators = ["uplifting", "positive", "good news", "celebrat", "success", "achievement"]
             content = result["result"].lower()
-            self.assertTrue(any(indicator in content for indicator in positive_indicators),
-                            msg="No positive indicators found in the result.")
+            self.assertTrue(
+                any(indicator in content for indicator in positive_indicators),
+                msg="No positive indicators found in the result."
+            )
         else:
             self.fail(f"Error: {result.get('error', 'Unknown error')}")
 

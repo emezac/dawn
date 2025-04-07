@@ -36,10 +36,9 @@ def call_openai(prompt):
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt}
         ],
-        max_tokens=500  # Increase this value as needed
+        max_tokens=1000  # Increased token limit for a more complete output
     )
     return response.choices[0].message.content.strip()
-
 
 def main():
     print("Starting Final Complex Workflow Example (Sequential Execution)")

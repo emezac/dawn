@@ -274,3 +274,69 @@ Implement a system to monitor and log task execution within the AI Agent Framewo
 - [ ] Gather feedback from stakeholders and make necessary adjustments.
 
 🚀 **Sprint Goal:** Successfully implement a monitored task execution system within the AI Agent Framework, enhancing its reliability and traceability.
+
+# 🧠 TODO List - Sprint for Conditional Workflow Implementation
+
+**Sprint Objective:**  
+Implement Conditional Workflow support within the AI Agent Framework to enhance its flexibility and adaptability.
+
+---
+
+## 📅 Week 1: Design and Setup
+
+### Day 1: Research and Planning
+
+- [x] Review existing workflow management systems for conditional logic.
+- [x] Define requirements for implementing conditional workflows.
+
+### Day 2-3: System Design
+
+- [x] Design the architecture for conditional workflows.
+- [x] Identify key conditions and branching logic to support.
+
+### Day 4: Environment Setup
+
+- [x] Set up necessary tools and environments for development.
+- [x] Configure initial settings for conditional logic.
+
+---
+
+## 📅 Week 2: Implementation and Testing
+
+### Day 5-6: Implementation
+
+- [x] Implement conditional logic in the workflow management system.
+- [x] Integrate conditional workflows into the existing framework.
+
+### Day 7: Testing and Debugging
+
+- [x] Write unit tests for conditional workflows.
+- [x] Conduct manual testing to ensure correct branching and execution.
+
+### Day 8: Documentation and Finalization
+
+- [ ] Update documentation to include instructions for using conditional workflows.
+- [ ] Review and finalize all code and documentation changes.
+
+---
+
+## Additional Tasks
+
+- [ ] Conduct a code review to ensure quality and consistency.
+- [ ] Gather feedback from stakeholders and make necessary adjustments.
+
+🚀 **Sprint Goal:** Successfully implement Conditional Workflow support within the AI Agent Framework, enhancing its flexibility and adaptability.
+
+## Web Search Tool
+
+The web search tool has been updated to use the latest model version and includes a timeout setting for improved performance.
+
+### Usage Example
+
+```python
+input_data = {
+    "query": "What was a positive news story from today?",
+    "context_size": "medium"
+}
+result = registry.execute_tool("web_search", input_data)
+```

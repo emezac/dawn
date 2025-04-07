@@ -1,5 +1,59 @@
 # AI Agent Framework
 
+The AI Agent Framework is designed to enhance the capabilities of AI agents, allowing them to perform tasks such as web searching, file reading, file uploading, and markdown file creation. Recent updates include support for conditional workflows and enhancements to the web search tool.
+
+## Features
+
+- **Conditional Workflows**: Enable dynamic task execution based on specific conditions or task outcomes, enhancing flexibility and adaptability.
+- **Web Search Tool**: Updated to use the latest model version with improved performance and reliability.
+
+## Usage
+
+### Conditional Workflows
+
+Conditional workflows allow for dynamic task execution based on specific conditions or task outcomes. This feature enhances the framework's flexibility and adaptability.
+
+#### Usage Example
+
+```python
+workflow = [
+    {
+        "id": "task_1",
+        "tool": "llm_generate_idea",
+        "condition": None
+    },
+    {
+        "id": "task_2a",
+        "tool": "draft_email",
+        "condition": {
+            "depends_on": "task_1",
+            "if_result": "good"
+        }
+    },
+    ...
+]
+```
+
+### Web Search Tool
+
+The web search tool has been updated to use the latest model version and includes a timeout setting for improved performance.
+
+#### Usage Example
+
+```python
+input_data = {
+    "query": "What was a positive news story from today?",
+    "context_size": "medium"
+}
+result = registry.execute_tool("web_search", input_data)
+```
+
+## Examples
+
+- **Complex Conditional Workflow**: `examples/complex_conditional_workflow.py`
+- **Simple Conditional Workflow**: `examples/simple_conditional_workflow.py`
+- **Complex Workflow**: `examples/complex_workflow.py`
+
 ## Overview
 
 The AI Agent Framework is an open-source Python framework designed to simplify the development of agent-based applications. It features a robust and explicit system for dynamic workflow management, allowing agents to break down complex tasks, execute sub-tasks, evaluate results, and dynamically adjust their action plans. This improves agent reliability and adaptability.
