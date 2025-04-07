@@ -122,7 +122,7 @@ Develop an executable Python script demonstrating a simple agent using a basic W
 # 🧠 TODO List - Sprint Expansion (2 Weeks)
 
 **Sprint Objective:**  
-Enhance the AI Agent Framework by integrating Web Search and File Read (RAG) capabilities using OpenAI's new tools. This will extend the framework's ability to access and utilize external data sources, improving the agent's contextual understanding and response generation.
+Enhance the AI Agent Framework by integrating Web Search, File Read (RAG), File Upload, and Markdown File Creation capabilities using OpenAI's new tools. This will extend the framework's ability to access and utilize external data sources, improving the agent's contextual understanding and response generation.
 
 ---
 
@@ -151,36 +151,69 @@ Enhance the AI Agent Framework by integrating Web Search and File Read (RAG) cap
 
 ---
 
-## 📅 Week 2: File Read (RAG) Tool Integration
+## 📅 Week 2: File Read (RAG) and File Upload Tool Integration
 
 ### ✅ Day 6: Research and Setup
 
-- [ ] Review OpenAI's documentation on File Read (RAG) capabilities.
-- [ ] Set up any necessary API configurations or permissions.
+- [x] Review OpenAI's documentation on File Read (RAG) capabilities.
+- [x] Set up any necessary API configurations or permissions.
 
 ### ✅ Day 7-8: File Read Tool Development
 
-- [ ] Implement a new tool interface for File Read (RAG).
-- [ ] Create a function to read and process file contents for context.
-- [ ] Integrate the File Read tool into the existing tool registry.
+- [x] Implement a new tool interface for File Read (RAG).
+- [x] Create a function to read and process file contents for context.
+- [x] Integrate the File Read tool into the existing tool registry.
 
-### ✅ Day 9: Testing and Debugging
+### ✅ Day 9: File Upload Tool Development
 
-- [ ] Write unit tests for the File Read tool.
-- [ ] Conduct manual testing to ensure correct file reading and context extraction.
+- [x] Implement a new tool interface for File Upload.
+- [x] Create a function to upload files and return file IDs.
+- [x] Integrate the File Upload tool into the existing tool registry.
 
-### ✅ Day 10: Documentation and Finalization
+### ✅ Day 10: Testing and Debugging
 
-- [ ] Update the documentation to include usage instructions for the File Read tool.
-- [ ] Provide examples of how to use the tool within a workflow.
-- [ ] Review and finalize all documentation and code changes.
+- [x] Write unit tests for the File Read and File Upload tools.
+- [x] Conduct manual testing to ensure correct file reading, uploading, and context extraction.
+
+### ✅ Day 11: Documentation and Finalization
+
+- [x] Update the documentation to include usage instructions for the File Read and File Upload tools.
+- [x] Provide examples of how to use the tools within a workflow.
+- [x] Review and finalize all documentation and code changes.
+
+---
+
+## 📅 Week 3: Markdown File Creation Tool Integration
+
+### Day 12: Research and Setup
+
+- [x] Review requirements for creating and managing Markdown files.
+- [x] Set up any necessary configurations or permissions.
+
+### Day 13-14: Markdown File Creation Tool Development
+
+- [x] Implement a new tool interface for Markdown File Creation.
+- [x] Create a function to generate and save Markdown files.
+- [x] Integrate the Markdown File Creation tool into the existing tool registry.
+
+### Day 15: Testing and Debugging
+
+- [x] Write unit tests for the Markdown File Creation tool.
+- [x] Conduct manual testing to ensure correct file creation and content formatting.
+
+### Day 16: Documentation and Finalization
+
+- [x] Update the documentation to include usage instructions for the Markdown File Creation tool.
+- [x] Provide examples of how to use the tool within a workflow.
+- [x] Review and finalize all documentation and code changes.
 
 ---
 
 ## Additional Tasks
 
-- [ ] Review and update the PRD to reflect the new tool capabilities.
-- [ ] Ensure all new features are covered by tests and documentation.
-- [ ] Conduct a code review to ensure quality and consistency.
+- [x] Review and update the PRD to reflect the new tool capabilities.
+- [x] Ensure all new features are covered by tests and documentation.
+- [x] Conduct a code review to ensure quality and consistency.
+- [x] Create a complex example workflow that uses all the new tools.
 
-🚀 **Sprint Goal:** Successfully integrate Web Search and File Read (RAG) tools into the AI Agent Framework, enhancing its ability to access and utilize external data sources.
+🚀 **Sprint Goal Achieved!** Successfully integrated Web Search, File Read (RAG), File Upload, and Markdown File Creation tools into the AI Agent Framework, enhancing its ability to access and utilize external data sources.
