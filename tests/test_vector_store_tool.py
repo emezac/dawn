@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from tools.registry import ToolRegistry
+from core.tools.registry import ToolRegistry
 
 class TestVectorStoreTool(unittest.TestCase):
     def setUp(self):

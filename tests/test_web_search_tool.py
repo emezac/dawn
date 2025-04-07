@@ -1,5 +1,5 @@
 import unittest
-from tools.registry import ToolRegistry
+from core.tools.registry import ToolRegistry
 
 class TestWebSearchTool(unittest.TestCase):
     def setUp(self):

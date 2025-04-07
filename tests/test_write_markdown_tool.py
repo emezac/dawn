@@ -1,6 +1,6 @@
 import unittest
 import os
-from tools.registry import ToolRegistry
+from core.tools.registry import ToolRegistry
 
 class TestWriteMarkdownTool(unittest.TestCase):
     def setUp(self):

@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
-from tools.registry import ToolRegistry
+
+from core.tools.registry import ToolRegistry
 from core.task import Task
 from core.workflow import Workflow
 from core.engine import WorkflowEngine
