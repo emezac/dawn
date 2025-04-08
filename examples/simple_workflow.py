@@ -14,13 +14,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 from openai import OpenAI
 from core.logging_setup import log_task_event
-from tools.registry import ToolRegistry
 
 from core.task import Task
 from core.workflow import Workflow
 from core.agent import Agent
 from tools.basic_tools import calculate, check_length
-from tools.registry import ToolRegistry
+
 
 # Load environment variables from .env file
 load_dotenv()

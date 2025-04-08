@@ -20,8 +20,7 @@ from openai import OpenAI
 # Add parent directory to path to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tools.registry import ToolRegistry
-
+from core.tools.registry import ToolRegistry
 # Load environment variables from .env file
 load_dotenv()
 

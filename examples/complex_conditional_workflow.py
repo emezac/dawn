@@ -17,10 +17,11 @@ import sys
 from dotenv import load_dotenv
 from openai import OpenAI
 
+
 # Add parent directory to path to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tools.registry import ToolRegistry
+from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
 from core.task import Task
 

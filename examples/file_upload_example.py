@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 
 # Ensure that the tools directory is added to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from tools.registry import ToolRegistry
+
+from core.tools.registry import ToolRegistry
 
 # Load environment variables from the .env file
 load_dotenv()
