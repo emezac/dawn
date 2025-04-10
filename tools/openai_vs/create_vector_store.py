@@ -1,7 +1,7 @@
 """
 Module for creating OpenAI Vector Stores.
 """
-from typing import Dict, Optional
+from typing import Optional
 
 from openai import OpenAI
 
