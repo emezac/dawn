@@ -35,7 +35,13 @@ This document outlines the plan to develop a new open-source Python framework fo
 4. **Basic Observability Features:**
    - Logging and tracing to support debugging and workflow analysis.
 
-5. **Initial Functional Version (v1.0):**
+5. **Code Quality and Developer Experience:**
+   - Consistent code style and formatting
+   - Automated linting and testing
+   - Developer-friendly documentation and tooling
+   - Pragmatic approach to linting rules with per-file customization
+
+6. **Initial Functional Version (v1.0):**
    - With clear documentation and usage examples.
 
 ## 4. Project Scope (Initial Version v1.0)
@@ -49,6 +55,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - Basic tool examples (e.g., calculator, web search mock).
 - Basic logging system for workflow tracing.
 - **Visualization of Workflow Execution:** Using Graphviz to create visual representations of workflows.
+- **Development Tools:** Code linting, formatting, and testing infrastructure.
 - Fundamental documentation (installation, basic concepts, simple tutorial).
 - Unit tests for core components.
 
@@ -111,6 +118,32 @@ This document outlines the plan to develop a new open-source Python framework fo
   - Implement real-time logging and status updates for task tracking.
   - Provide documentation and examples for defining and executing parallel workflows.
 
+### Development and Code Quality Tools
+
+- **Linting and Formatting:**
+  - **flake8:** For linting and style checking
+    - Configured with extended line length (120 characters)
+    - Customized per-file ignore rules for different file types
+    - Ignores specific error codes where appropriate (E501, E402, F401, etc.)
+  - **black:** For automatic code formatting
+    - Configured with 120 character line length
+    - Consistently enforced across all Python files
+  - **isort:** For import sorting and organization
+    - Configured to be compatible with black
+    - Uses the same line length settings
+  - **Pre-commit hooks:** To ensure code quality before commits
+    - Automatically runs black, isort, and flake8 before each commit
+    - Prevents committing code that doesn't meet standards
+- **Testing Infrastructure:**
+  - **pytest:** For unit and integration testing
+  - **Test helpers and mocks:** For simplified test creation
+  - **Path setup:** Properly handles imports in test files
+- **Development Workflow:**
+  - **Makefile:** For common development tasks (format, lint, test)
+  - **Utility scripts:** For linting, testing, and other routine operations
+  - **CI/CD integration:** For automated testing and deployment
+  - **Configuration files:** setup.cfg, pyproject.toml, and .pre-commit-config.yaml
+
 ## 6. Technical Approach
 
 - **Language:** Python 3.x (robust AI/ML ecosystem and community).
@@ -120,6 +153,12 @@ This document outlines the plan to develop a new open-source Python framework fo
   - Explicit control logic (loops, conditionals) to manage state- and feedback-driven flow.
 - **Dependencies:** Minimal for the core. APIs like `openai` and `requests` for specific use cases.
 - **Testing:** `pytest` for unit and integration tests.
+- **Code Quality:**
+  - Consistent style using linting and formatting tools.
+  - Pre-commit hooks to enforce standards automatically.
+  - Regular code reviews.
+  - Pragmatic approach to linting that balances strictness with practicality.
+  - Per-file customizations for specific code patterns and contexts.
 
 ## 7. Development Phases and Roadmap
 
@@ -130,6 +169,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - Build initial LLM interface (e.g., OpenAI Chat Completions with function calling).
 - Create basic execution engine.
 - Set up initial logging.
+- Establish development environment and tooling (linting, formatting, testing).
 
 **Milestone:** Minimal agent executes a predefined simple workflow using an LLM and mock tool.
 
@@ -142,6 +182,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - Add more observability/logging.
 - **Visualization of Workflows:** Implement visualization using Graphviz.
 - Write tests for WMS and tool integration.
+- Enhance development tools and documentation.
 
 **Milestone:** Agent executes workflow with conditionals, retries failed tasks, uses external tools, and adjusts plans based on intermediate results.
 
@@ -152,6 +193,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - Improve test coverage.
 - Consider simple state persistence (optional).
 - Package framework for easy installation (PyPI).
+- Finalize development tools and contributor guidelines.
 
 **Milestone:** Launch of version v1.0 as an open-source package.
 
@@ -159,6 +201,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 
 - **Personnel:** 1–2 Python developers with software design and AI/LLM experience.
 - **Infrastructure:** Standard dev environment, access to LLM APIs (token/credit budget), version control (e.g., GitHub).
+- **Development Tools:** linting, formatting, and testing tools; CI/CD integration.
 - **Time:** Approximately 14–20 weeks for v1.0 (depending on availability).
 
 ## 9. Risks and Mitigation
@@ -166,6 +209,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - **Workflow Complexity:** Start with simple use cases, use modular design, iterate with feedback.
 - **LLM API/Paradigm Changes:** Abstract LLM interfaces, stay updated, plan for periodic refactors.
 - **Tool Interface Challenges:** Focus on simple, flexible registration/call mechanism; provide good examples.
+- **Code Quality Consistency:** Implement automated linting and testing with CI/CD integration.
 - **Limited Community Adoption:** Emphasize ease of use, strong documentation, clear examples, and unique value proposition (WMS). Publish as open source.
 
 ## 10. Success Metrics
@@ -174,6 +218,7 @@ This document outlines the plan to develop a new open-source Python framework fo
 - WMS successfully implements decomposition, execution, feedback, and dynamic adjustment.
 - Easy for a Python developer to create a simple agent (measured via tutorials and feedback).
 - Clear, complete documentation.
+- High code quality standards maintained throughout the codebase.
 - Successful publication on PyPI and GitHub.
 - (Long-term) Community adoption, external contributions, real-world project usage.
 

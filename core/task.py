@@ -1,4 +1,5 @@
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
 
 class Task:
     def __init__(
@@ -12,7 +13,7 @@ class Task:
         next_task_id_on_success: Optional[str] = None,
         next_task_id_on_failure: Optional[str] = None,
         condition: Optional[str] = None,
-        parallel: bool = False
+        parallel: bool = False,
     ):
         self.id = task_id
         self.name = name

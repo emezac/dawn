@@ -1,14 +1,21 @@
-from typing import Optional, Any, Dict
-
-from openai import OpenAI, APIError, APIConnectionError, RateLimitError # Import necessary OpenAI classes
 import os
+from typing import Any, Dict, Optional
 
-from core.utils.logger import log_info, log_error
+from openai import (  # Import necessary OpenAI classes
+    APIConnectionError,
+    APIError,
+    OpenAI,
+    RateLimitError,
+)
+
+from core.utils.logger import log_error, log_info
+
 
 class LLMInterface:
     """
     Handles interactions with the configured Language Model API (e.g., OpenAI).
     """
+
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo"):
         """
         Initializes the LLM interface client.
@@ -30,7 +37,6 @@ class LLMInterface:
         except Exception as e:
             log_error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
             raise ConnectionError(f"Failed to initialize OpenAI client: {e}")
-
 
     def execute_llm_call(self, prompt: str, system_message: str = "You are a helpful assistant.") -> Dict[str, Any]:
         """
@@ -55,10 +61,10 @@ class LLMInterface:
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_message},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
-                 max_tokens=1500, # Sensible default, make configurable if needed
-                 temperature=0.7  # Common default, make configurable if needed
+                max_tokens=1500,  # Sensible default, make configurable if needed
+                temperature=0.7,  # Common default, make configurable if needed
             )
 
             # Validate response structure and extract content
@@ -69,7 +75,7 @@ class LLMInterface:
             else:
                 # Handle cases where the API response structure is unexpected
                 error_msg = "LLM response object missing expected content structure."
-                log_error(f"{error_msg} Full Response: {response}") # Log the actual response object
+                log_error(f"{error_msg} Full Response: {response}")  # Log the actual response object
                 return {"success": False, "error": error_msg}
 
         except (APIError, APIConnectionError, RateLimitError) as api_e:

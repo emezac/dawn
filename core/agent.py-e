@@ -4,7 +4,6 @@ Agent module for the AI Agent Framework.
 This module provides the Agent class which serves as the central entry point for the framework.
 It manages workflows, interfaces with LLMs, and coordinates tool execution.
 """
-
 import asyncio
 from typing import Any, Callable, Dict, Optional
 
@@ -18,7 +17,7 @@ from core.workflow import Workflow
 
 class Agent:
     """Main agent class for the AI Agent Framework.
-
+    
     Manages workflows, LLM interfaces, and tool registries. The Agent class
     serves as the primary interface for users of the framework, handling
     the loading and execution of workflows.
@@ -34,10 +33,10 @@ class Agent:
         model: str = "gpt-3.5-turbo",
     ):
         """Initialize an Agent instance.
-
+        
         Args:
-            agent_id: Unique identifier for the agen
-            name: Human-readable name for the agen
+            agent_id: Unique identifier for the agent
+            name: Human-readable name for the agent
             llm_interface: LLMInterface instance, or None to create a default one
             tool_registry: ToolRegistry instance, or None to create a default one
             api_key: API key for LLM service if no interface is provided

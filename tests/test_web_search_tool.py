@@ -1,7 +1,7 @@
+import os
+import sys
 import unittest
 
-import sys
-import os
 # Add parent directory to path to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,24 +23,32 @@ class TestWebSearchTool(unittest.TestCase):
                 "type": "approximate",
                 "country": "US",
                 "city": "New York",
-                "region": "NY"
-            }
+                "region": "NY",
+            },
         }
-        
+
         # Execute the web search tool
         result = self.registry.execute_tool("web_search", input_data)
-        
+
         # Assert the result
         if result["success"]:
             # Modified positive indicators to be more flexible.
-            positive_indicators = ["uplifting", "positive", "good news", "celebrat", "success", "achievement"]
+            positive_indicators = [
+                "uplifting",
+                "positive",
+                "good news",
+                "celebrat",
+                "success",
+                "achievement",
+            ]
             content = result["result"].lower()
             self.assertTrue(
                 any(indicator in content for indicator in positive_indicators),
-                msg="No positive indicators found in the result."
+                msg="No positive indicators found in the result.",
             )
         else:
             self.fail(f"Error: {result.get('error', 'Unknown error')}")
+
 
 if __name__ == "__main__":
     unittest.main()

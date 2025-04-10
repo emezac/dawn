@@ -4,31 +4,31 @@ Basic tools for the AI Agent Framework.
 This module provides some basic tools that can be used by the agent.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 def calculate(operation: str, a: float, b: float) -> float:
     """
     Perform basic arithmetic calculations.
-    
+
     Args:
         operation: The operation to perform (add, subtract, multiply, divide)
         a: First number
         b: Second number
-            
+
     Returns:
         The result of the calculation
-        
+
     Raises:
         ValueError: If the operation is invalid or inputs are missing
     """
-    if operation == 'add':
+    if operation == "add":
         return a + b
-    elif operation == 'subtract':
+    elif operation == "subtract":
         return a - b
-    elif operation == 'multiply':
+    elif operation == "multiply":
         return a * b
-    elif operation == 'divide':
+    elif operation == "divide":
         if b == 0:
             raise ValueError("Cannot divide by zero")
         return a / b

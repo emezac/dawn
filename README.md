@@ -119,7 +119,13 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
    pip install -r requirements.txt
    ```
 
-4. **Set Up Environment Variables:**
+4. **Install Development Dependencies (optional):**
+
+   ```bash
+   pip install -r requirements-dev.txt
+   ```
+
+5. **Set Up Environment Variables:**
    - Create a `.env` file in the root directory.
    - Add your OpenAI API key:
 
@@ -147,6 +153,63 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
 4. **Visualize Workflow Execution:**
    - Use the `visualize_workflow` function to generate visual representations of your workflows.
 
+## Development
+
+### Code Style and Linting
+
+This project uses several tools to maintain code quality:
+
+- **Black**: For code formatting (line length: 120 characters)
+- **isort**: For sorting imports (configured to work with Black)
+- **Flake8**: For linting and style checking
+
+The project is configured with appropriate settings for each tool:
+- Line length is set to 120 characters for all tools
+- Specific file patterns have customized linting rules
+- Common errors are selectively ignored in example and test files
+
+#### Setup Pre-commit Hooks
+
+```bash
+pre-commit install
+```
+
+#### Manual Linting
+
+You can use the Makefile or the lint script for linting:
+
+```bash
+# Using Make
+make format    # Run isort and black
+make lint      # Run flake8
+make lint-all  # Run both formatting and linting
+
+# Using the lint script
+./lint.sh
+```
+
+#### Running Tests
+
+```bash
+make test      # Run all tests with pytest
+PYTHONPATH=.  python -m unittest tests/test_file_name.py  # Run a specific test file
+```
+
+#### Linting Configuration
+
+The project includes the following configuration files:
+- `setup.cfg`: Contains settings for flake8 and isort
+  - Configures what errors to ignore globally and per file
+  - Ignores common docstring-related errors (D100-D107, D200, D205, D400, D401)
+- `pyproject.toml`: Contains settings for black
+- `.pre-commit-config.yaml`: Configures pre-commit hooks for automatic linting
+  - Includes flake8-docstrings as an additional dependency for pre-commit checks
+
+**Note on docstring checking**: When running `flake8` directly, it uses the configuration in `setup.cfg`. 
+However, the pre-commit hook includes additional docstring checking through flake8-docstrings. 
+The setup is configured to ignore most docstring formatting errors to maintain a balance between 
+code quality and development speed.
+
 ## Key Concepts
 
 - **Task:** Represents a unit of work with attributes like `id`, `name`, `status`, `input_data`, `output_data`, `is_llm_task`, and `tool_name`.
@@ -161,6 +224,11 @@ The project is structured into phases, with the initial version focusing on core
 ## Contributing
 
 Contributions are welcome! Please fork the repository and submit a pull request with your changes. Ensure that your code adheres to the project's coding standards and includes appropriate tests.
+
+Before submitting a pull request:
+1. Run the linting tools to ensure code quality
+2. Make sure all tests pass
+3. Update documentation if necessary
 
 ## License
 

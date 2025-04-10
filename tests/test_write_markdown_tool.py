@@ -1,8 +1,7 @@
-import unittest
 import os
-
 import sys
-import os
+import unittest
+
 # Add parent directory to path to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,10 +22,7 @@ class TestWriteMarkdownTool(unittest.TestCase):
 
     def test_write_markdown(self):
         """Test the Write Markdown tool."""
-        input_data = {
-            "file_path": self.test_file_path,
-            "content": self.test_content
-        }
+        input_data = {"file_path": self.test_file_path, "content": self.test_content}
         result = self.registry.execute_tool("write_markdown", input_data)
         self.assertTrue(result["success"], msg=f"Tool execution failed: {result.get('error')}")
         # Verify that the returned result equals the file path
@@ -35,6 +31,7 @@ class TestWriteMarkdownTool(unittest.TestCase):
         with open(self.test_file_path, "r", encoding="utf-8") as f:
             file_content = f.read()
         self.assertEqual(file_content, self.test_content)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,33 +1,37 @@
-import networkx as nx
-import graphviz
 import re
-from typing import Optional, List, Dict, Any
-from core.workflow import Workflow
+from typing import Any, Dict, List, Optional
+
+import graphviz
+import networkx as nx
+
 from core.task import Task
+from core.workflow import Workflow
+
 
 def _extract_dependencies_from_value(value: Any, current_task_id: str) -> List[str]:
     """Extracts task IDs referenced in placeholders within a string or list item."""
     dependencies = []
     # Regex to find ${task_id.output_data...}
-    placeholder_regex = r'\${([^.}]+)\.output_data\.[^}]+}'
+    placeholder_regex = r"\${([^.}]+)\.output_data\.[^}]+}"
 
     if isinstance(value, str):
         matches = re.findall(placeholder_regex, value)
         for ref_task_id in matches:
-            if ref_task_id != current_task_id: # Avoid self-references if they somehow occur
-                 dependencies.append(ref_task_id)
+            if ref_task_id != current_task_id:  # Avoid self-references if they somehow occur
+                dependencies.append(ref_task_id)
     elif isinstance(value, list):
         for item in value:
             # Recursively check items in the list
             dependencies.extend(_extract_dependencies_from_value(item, current_task_id))
     elif isinstance(value, dict):
-         for dict_value in value.values():
-              # Recursively check values in a dictionary
-              dependencies.extend(_extract_dependencies_from_value(dict_value, current_task_id))
+        for dict_value in value.values():
+            # Recursively check values in a dictionary
+            dependencies.extend(_extract_dependencies_from_value(dict_value, current_task_id))
 
-    return list(set(dependencies)) # Return unique dependencies
+    return list(set(dependencies))  # Return unique dependencies
 
-def visualize_workflow(workflow: Workflow, filename: str = "workflow_graph", format: str = 'pdf', view: bool = False):
+
+def visualize_workflow(workflow: Workflow, filename: str = "workflow_graph", format: str = "pdf", view: bool = False):
     """
     Generates a visual representation of the workflow dependency graph using Graphviz.
 
@@ -37,20 +41,20 @@ def visualize_workflow(workflow: Workflow, filename: str = "workflow_graph", for
         format: The output format (e.g., 'pdf', 'png', 'svg').
         view: If True, automatically opens the generated file.
     """
-    dot = graphviz.Digraph(comment=f'Workflow: {workflow.name}')
-    dot.attr(rankdir='TB', label=f"Workflow: {workflow.name} (ID: {workflow.id})", fontsize='20')
+    dot = graphviz.Digraph(comment=f"Workflow: {workflow.name}")
+    dot.attr(rankdir="TB", label=f"Workflow: {workflow.name} (ID: {workflow.id})", fontsize="20")
 
     # Add nodes (Tasks)
     for task_id, task in workflow.tasks.items():
         # Node styling based on type or status (optional)
-        shape = 'box'
-        style = 'filled'
-        fillcolor = 'lightgrey' # Default
+        shape = "box"
+        style = "filled"
+        fillcolor = "lightgrey"  # Default
         if task.is_llm_task:
-            fillcolor = 'lightblue'
+            fillcolor = "lightblue"
         if task.parallel:
-             shape='ellipse' # Indicate parallel capability
-             fillcolor='lightyellow'
+            shape = "ellipse"  # Indicate parallel capability
+            fillcolor = "lightyellow"
 
         label = f"ID: {task.id}\nName: {task.name}"
         if task.condition:
@@ -64,10 +68,10 @@ def visualize_workflow(workflow: Workflow, filename: str = "workflow_graph", for
         "success": {"color": "green", "style": "dashed", "label": " on_success"},
         "failure": {"color": "red", "style": "dashed", "label": " on_failure"},
         "condition_true": {"color": "blue", "style": "dotted", "label": " if_true"},
-        "condition_false": {"color": "orange", "style": "dotted", "label": " if_false"}
+        "condition_false": {"color": "orange", "style": "dotted", "label": " if_false"},
     }
 
-    processed_edges = set() # To avoid duplicate edges
+    processed_edges = set()  # To avoid duplicate edges
 
     for task_id, task in workflow.tasks.items():
         # 1. Data Dependencies from Input Placeholders
@@ -76,38 +80,38 @@ def visualize_workflow(workflow: Workflow, filename: str = "workflow_graph", for
                 deps = _extract_dependencies_from_value(value, task.id)
                 for dep_task_id in deps:
                     if dep_task_id in workflow.tasks:
-                         edge = (dep_task_id, task_id)
-                         if edge not in processed_edges:
-                              dot.edge(dep_task_id, task_id, **edge_styles["data"])
-                              processed_edges.add(edge)
+                        edge = (dep_task_id, task_id)
+                        if edge not in processed_edges:
+                            dot.edge(dep_task_id, task_id, **edge_styles["data"])
+                            processed_edges.add(edge)
                     else:
-                         print(f"Warning: Task '{task_id}' references unknown task '{dep_task_id}' in input.")
+                        print(f"Warning: Task '{task_id}' references unknown task '{dep_task_id}' in input.")
 
         # 2. Control Flow Dependencies (Conditional Logic)
         if task.condition:
             # If condition is present, success/failure paths represent the two outcomes
             if task.next_task_id_on_success and task.next_task_id_on_success in workflow.tasks:
-                 edge = (task_id, task.next_task_id_on_success)
-                 if edge not in processed_edges:
-                      dot.edge(task_id, task.next_task_id_on_success, **edge_styles["condition_true"])
-                      processed_edges.add(edge)
+                edge = (task_id, task.next_task_id_on_success)
+                if edge not in processed_edges:
+                    dot.edge(task_id, task.next_task_id_on_success, **edge_styles["condition_true"])
+                    processed_edges.add(edge)
             if task.next_task_id_on_failure and task.next_task_id_on_failure in workflow.tasks:
-                 edge = (task_id, task.next_task_id_on_failure)
-                 if edge not in processed_edges:
-                      dot.edge(task_id, task.next_task_id_on_failure, **edge_styles["condition_false"])
-                      processed_edges.add(edge)
+                edge = (task_id, task.next_task_id_on_failure)
+                if edge not in processed_edges:
+                    dot.edge(task_id, task.next_task_id_on_failure, **edge_styles["condition_false"])
+                    processed_edges.add(edge)
         else:
             # If no condition, success/failure paths are direct control flow
             if task.next_task_id_on_success and task.next_task_id_on_success in workflow.tasks:
-                 edge = (task_id, task.next_task_id_on_success)
-                 if edge not in processed_edges:
-                      dot.edge(task_id, task.next_task_id_on_success, **edge_styles["success"])
-                      processed_edges.add(edge)
+                edge = (task_id, task.next_task_id_on_success)
+                if edge not in processed_edges:
+                    dot.edge(task_id, task.next_task_id_on_success, **edge_styles["success"])
+                    processed_edges.add(edge)
             if task.next_task_id_on_failure and task.next_task_id_on_failure in workflow.tasks:
-                 edge = (task_id, task.next_task_id_on_failure)
-                 if edge not in processed_edges:
-                      dot.edge(task_id, task.next_task_id_on_failure, **edge_styles["failure"])
-                      processed_edges.add(edge)
+                edge = (task_id, task.next_task_id_on_failure)
+                if edge not in processed_edges:
+                    dot.edge(task_id, task.next_task_id_on_failure, **edge_styles["failure"])
+                    processed_edges.add(edge)
 
         # 3. Implicit Sequential Dependency (Optional - can make graph cluttered)
         # This adds an edge if task A is immediately before task B in task_order
