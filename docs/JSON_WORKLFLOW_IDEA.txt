@@ -1,0 +1,130 @@
+Revised Flow: Generating JSON Workflow Definitions
+Phase 0: Knowledge Ingestion (Setup)
+Action: Ingest dawn framework documentation into vs_dawn_framework_docs. Crucially, this documentation must now include:
+A clear definition (and ideally examples) of the target JSON structure for workflows and tasks.
+Detailed descriptions of all available tools and their expected input_data structure (representable in JSON).
+Explanation of parameters like dependencies, parallel, use_file_search, etc., within the JSON context.
+(Optional but Recommended): Formally define a JSON Schema (.json file) for workflow definitions and include it in the ingested docs.
+Phase 1: User Request (Chat Interface)
+Action: User provides their goal in natural language (same as before).
+Example Input: "Review a contract draft against legal docs in 'vs_legal_guidelines', check web updates, highlight issues, and save a report."
+Phase 2: Workflow JSON Generation (Core Meta-Agent Task)
+Action: Trigger the "Workflow Generator Agent".
+Internal Workflow (Conceptual - JSON Output):
+Task A (LLM + RAG - Planning):
+Input: User request.
+Prompt: "Analyze the user's request: '[User Request]'. Based on the 'dawn' framework capabilities (tools, task parameters) described in context, outline the necessary workflow steps, required tools/LLM tasks, data flow, dependencies, and any specific parameters mentioned (like Vector Store IDs)."
+RAG: Uses file_search against vs_dawn_framework_docs.
+Output: A structured plan (internal representation).
+Task B (LLM + RAG - JSON Generation):
+Input: Structured plan from Task A, user request, examples/schema of the target JSON workflow structure.
+Prompt: "Based on the workflow plan: '[Plan from Task A]' and the user's request, generate a valid JSON object representing this workflow according to the 'dawn' workflow JSON schema provided in context. Define 'workflow_id', 'name', and a 'tasks' array. Each task object must include 'task_id', 'name', and specify either 'tool_name' or 'is_llm_task': true. Include 'input_data' (using '${task_id.output_data}' syntax for variables), 'dependencies' (as an array of task IDs), 'parallel' (boolean, default false), and relevant file search parameters ('use_file_search', 'file_search_vector_store_ids') if needed. Ensure the JSON is well-formed. Output ONLY the JSON object."
+RAG: Searches vs_dawn_framework_docs specifically for the JSON schema definition and examples.
+Output: A string containing the generated JSON workflow definition.
+Phase 3: Validation & Interpretation (Framework Logic)
+Action 1 (Parse JSON):
+Take the JSON string output from Phase 2.
+Attempt to parse it using json.loads(generated_json_string).
+Handle JSONDecodeError if the LLM output wasn't valid JSON.
+Action 2 (Validate Schema - Recommended):
+Use a library like jsonschema to validate the parsed Python dictionary against your predefined workflow JSON Schema.
+Handle validation errors (missing fields, incorrect types, etc.).
+Action 3 (Interpret JSON):
+Create a dedicated parser function or method within your framework (e.g., Workflow.from_dict(workflow_data) or load_workflow_from_dict(workflow_data)).
+This function iterates through the validated dictionary:
+Creates a Workflow instance.
+For each dictionary in the tasks array:
+Creates a Task instance, mapping keys (task_id, name, input_data, dependencies, etc.) from the dictionary to the Task object's attributes.
+Perform type checking/conversion if necessary.
+Adds the created Task objects to the Workflow.
+Result: A valid dawn Workflow object, constructed safely from the JSON definition.
+Phase 4: Dynamic Execution
+Action: Instantiate a standard dawn Agent, load the interpreted Workflow object (from Phase 3), provide necessary initial workflow_input, and call agent.run().
+Phase 5: Result Delivery
+Action: Capture and present the final result(s) to the user (same as before).
+Example Target JSON Structure (for Legal Review Workflow):
+{
+  "workflow_id": "generated_legal_review_123",
+  "name": "Generated Legal Contract Review",
+  "tasks": [
+    {
+      "task_id": "task_1_extract_topics",
+      "name": "Extract Contract Topics",
+      "is_llm_task": true,
+      "input_data": {
+        "prompt": "Identify the main legal topics or clause types present in this contract draft:\n\n{workflow_input[draft_contract]}\n\nList them concisely."
+      },
+      "dependencies": [],
+      "parallel": false
+    },
+    {
+      "task_id": "task_2_search_internal_docs",
+      "name": "Search Internal Legal Guidelines",
+      "is_llm_task": true,
+      "input_data": {
+        "prompt": "Based *only* on the provided internal legal documents, retrieve relevant guidelines, standard clauses, and potential compliance issues related to the following topics found in a draft contract: ${task_1_extract_topics.output_data}. Also check guidelines relevant to the overall contract structure if applicable."
+      },
+      "dependencies": ["task_1_extract_topics"],
+      "parallel": true,
+      "use_file_search": true,
+      "file_search_vector_store_ids": ["{workflow_input[legal_vs_id]}"]
+    },
+    {
+      "task_id": "task_3_search_web_updates",
+      "name": "Search Web for Recent Legal Updates",
+      "tool_name": "web_search",
+      "input_data": {
+        "query": "Recent legal updates or notable court rulings in {workflow_input[jurisdiction]} concerning contract clauses related to: ${task_1_extract_topics.output_data}",
+        "context_size": "medium"
+      },
+      "dependencies": ["task_1_extract_topics"],
+      "parallel": true
+    },
+    {
+      "task_id": "task_4_synthesize_and_redline",
+      "name": "Synthesize Findings and Generate Redlines",
+      "is_llm_task": true,
+      "input_data": {
+          "prompt": "Review the following draft contract:\n--- DRAFT CONTRACT ---\n{workflow_input[draft_contract]}\n--- END DRAFT CONTRACT ---\n\nConsider the following context:\n1. Internal Legal Guidelines Summary: ${task_2_search_internal_docs.output_data}\n2. Recent Web Updates Summary: ${task_3_search_web_updates.output_data}\n3. (Implicit Context) Relevant past interactions or preferences from long-term memory.\n\nYour task is to act as an in-house legal reviewer..." // (Rest of prompt)
+      },
+      "dependencies": ["task_2_search_internal_docs", "task_3_search_web_updates"],
+      "parallel": false,
+      "use_file_search": true,
+      "file_search_vector_store_ids": ["{agent_config[ltm_vector_store_id]}"]
+    },
+    {
+      "task_id": "task_5_save_to_ltm",
+      "name": "Save Review Summary to LTM",
+      "tool_name": "save_to_ltm",
+      "input_data": {
+        "vector_store_id": "{agent_config[ltm_vector_store_id]}",
+        "text_content": "Contract review performed on [DATE] for draft: '{workflow_input[draft_contract][:100]}...'. Key findings/Redlines: ${task_4_synthesize_and_redline.output_data[:500]}..."
+      },
+      "dependencies": ["task_4_synthesize_and_redline"],
+      "parallel": false
+    },
+    {
+      "task_id": "task_6_format_output",
+      "name": "Format Final Review Report",
+      "tool_name": "write_markdown",
+      "input_data": {
+        "file_path": "{workflow_input[output_report_path]}",
+        "content": "# Contract Review Report\n\n## Draft Contract Snippet\n```\n{workflow_input[draft_contract][:500]}...\n```\n\n## Review Findings & Redlines\n${task_4_synthesize_and_redline.output_data}\n\n*Internal Guidelines Citations: ${task_2_search_internal_docs.output_annotations}*\n*LTM Context Used: Yes/No based on task 4 annotations*"
+      },
+      "dependencies": ["task_4_synthesize_and_redline", "task_5_save_to_ltm"],
+      "parallel": false
+    }
+  ]
+}
+Use code with caution.
+Json
+Advantages of this JSON Approach:
+Much Safer: Eliminates the risks of arbitrary code execution.
+More Robust Generation: LLMs are better at generating structured data like JSON than complex code.
+Explicit Validation: Allows for schema validation before attempting execution.
+Clear Separation: Separates the definition of the workflow (JSON) from the execution logic (Python framework).
+Disadvantages:
+Requires Interpreter: You need to build the logic within dawn to parse the JSON and instantiate the Workflow/Task objects.
+Less Flexible (Potentially): You can only express workflows that fit your defined JSON schema. Complex Python logic within the definition isn't possible (which is actually a safety feature here).
+Schema Maintenance: The JSON schema needs to be kept in sync with the framework's capabilities.
+This JSON-based approach is a highly recommended, safer, and more maintainable way to implement the powerful idea of dynamically generating workflows from user requests.

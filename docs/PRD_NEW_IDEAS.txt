@@ -1,0 +1,220 @@
+Consolidated Project Requirements Document (PRD): Dawn Framework Enhancements vNext
+1. Executive Summary
+This document outlines the next major phase of development for the "dawn" AI Agent Framework. The primary goal is to significantly enhance agent capabilities by introducing Context-Awareness (Long-Term Memory and efficient Retrieval-Augmented Generation via OpenAI Vector Stores), enabling Interoperability through integration with the Model Context Protocol (MCP), and providing a powerful Dynamic Workflow Generation mechanism using structured JSON definitions. These features will make "dawn" agents more knowledgeable, adaptable, extensible, and potentially easier to configure for complex tasks.
+2. Motivation and Problem to Solve
+Agent Amnesia: Lack of persistent memory limits agents' ability to learn from past interactions or maintain context across sessions.
+Inefficient Knowledge Access: Basic file tools are insufficient for semantic search over large, user-provided document sets (RAG).
+Limited Extensibility: Integrating new external tools requires custom coding within the framework. A standardized approach (MCP) is needed.
+Workflow Definition Complexity: Defining complex workflows directly in Python can be cumbersome or inaccessible for some users.
+Need for Adaptability: Agents need mechanisms to dynamically construct or modify their plans based on high-level user goals.
+3. Goals and Objectives
+Main Goal: Evolve "dawn" into a more context-aware, interoperable, and dynamically configurable AI agent framework.
+Key Objectives
+Implement Context-Awareness:
+Integrate OpenAI Vector Stores for efficient RAG and LTM storage.
+Enable agents to search user-provided documents via OpenAI File Search.
+Provide mechanisms for basic Long-Term Memory (storage and retrieval).
+Enable MCP Interoperability:
+Implement an MCP Client capability within "dawn".
+Allow agents to discover and execute tools exposed by external MCP Servers (initially via stdio).
+Implement Dynamic Workflow Generation:
+Define a JSON schema for representing "dawn" workflows.
+Develop the capability for an LLM-powered agent (the "Generator Agent") to create these JSON workflow definitions based on natural language requests and knowledge of the framework.
+Implement safe interpretation and execution of these JSON-defined workflows within the framework.
+Maintain Core Philosophy: Ensure all new features align with "dawn's" principles of explicit workflow management, modularity, and observability.
+4. Scope
+Included (vNext Release)
+Context-Awareness:
+Core Vector Store management tools (create, upload/add file with polling, list, delete, save text).
+Integration of OpenAI file_search tool within LLM tasks, including citation handling.
+Basic LTM mechanism using a dedicated VS (explicit save, implicit retrieval via file_search).
+MCP Client Integration:
+Configuration system for MCP servers (stdio type initially).
+MCPClientManager for session handling (stdio).
+Dynamic discovery (list_tools) and registration of MCPTool wrappers in ToolRegistry.
+MCPTool class handling dynamic schema generation (Pydantic) and call_tool execution.
+Support for async tool execution in the WMS core.
+Dynamic Workflow Generation (JSON):
+Formal JSON Schema definition for "dawn" workflows.
+JSON Schema validation utility (jsonschema library).
+JSON interpretation logic (Workflow.from_dict or similar).
+execute_workflow_from_json tool for safe execution.
+RAG-optimized documentation of the framework (including JSON schema) for the Generator Agent.
+A Proof-of-Concept (PoC) "Workflow Generator Agent" workflow definition.
+General:
+Enhanced logging for new features.
+Unit and integration tests for new components.
+Updated documentation covering all new features and usage.
+Excluded (Future Considerations)
+Advanced LTM structuring, summarization, or automatic context injection.
+Other MCP transport types (HTTP) or advanced MCP features.
+Graphical User Interfaces (UI).
+Raw Python code generation/execution.
+Extensive library of pre-built tools beyond core framework needs.
+Fine-tuning models for specific tasks (generation or execution).
+Multi-agent orchestration beyond calling MCP tools.
+5. Key Features in Detail
+5.1. Context-Awareness Features
+Vector Store Tools: vector_store_create, upload_file_to_vector_store (handles polling), save_text_to_vector_store (uses upload tool internally), list_vector_stores, delete_vector_store. Tools interact with OpenAI API.
+File Search in Tasks: Task definitions accept use_file_search: bool, file_search_vector_store_ids: list[str]. WMS/LLMInterface uses this to configure file_search tool in OpenAI API calls. Handles file_search_call and message outputs, extracting text and annotations.
+Long-Term Memory (LTM): Agent configured with an LTM VS ID. save_text_to_vector_store used for explicit storage. Retrieval happens implicitly by including the LTM VS ID in file_search_vector_store_ids for relevant LLM tasks.
+5.2. MCP Client Features (MCPTool)
+Configuration: Mechanism to define MCP servers (alias, stdio type, command, args, env).
+MCPClientManager: Manages stdio connections, sessions, initialize, list_tools calls. Runs asynchronously.
+MCPTool: Wrapper class registered in ToolRegistry (e.g., mcp:<alias>:<tool>). Dynamically creates Pydantic input model from JSON schema. Executes call_tool asynchronously via MCPClientManager.
+Async Core: WMS execution logic updated to await asynchronous tool calls.
+5.3. Dynamic Workflow Generation (JSON) Features
+Workflow JSON Schema: A precise .json file defining the structure for workflow_id, name, and tasks array, including all valid task parameters (task_id, name, tool_name, is_llm_task, input_data, dependencies, parallel, use_file_search, etc.) and variable syntax (${task_id.output_data}).
+Validation Utility: Python function using jsonschema to validate parsed JSON against the schema.
+Interpretation Logic: Framework function (load_workflow_from_dict) to safely build Workflow and Task objects from a validated dictionary.
+execute_workflow_from_json Tool: Takes JSON string + initial input, performs validation, interpretation, and execution using a temporary Agent instance. Returns the final result.
+RAG Documentation: Specific documentation detailing the framework's JSON schema, tools (including input schemas), and parameters, designed to be effectively used via RAG by the Generator Agent.
+Generator Agent (PoC): A predefined dawn workflow that takes a natural language request, uses RAG on the framework docs, and outputs a workflow JSON string (using LLM tasks).
+6. Technical Approach
+Language: Python 3.x, asyncio for concurrency.
+Libraries: openai (latest), pydantic, jsonschema, python-dotenv, standard libraries (asyncio, json, subprocess, importlib). Potentially an MCP client library if available/suitable.
+Design: Extend existing modular structure. Encapsulate MCP logic. Separate JSON definition/validation/interpretation.
+Testing: pytest or unittest for unit tests. Integration tests requiring OpenAI API calls and potentially running mock/real MCP servers.
+7. Development Phases and Roadmap (Logical Order)
+Phase 1: Foundation - Context-Awareness: Implement Vector Store tools, File Search integration, and basic LTM. (Provides core RAG needed for Phase 3).
+Phase 2: Extensibility - MCP Client: Implement MCP configuration, client manager, MCPTool wrapper, and async WMS core updates.
+Phase 3: Meta-Capability - Dynamic Generation (JSON): Define JSON schema, implement validation, interpretation, and the execute_workflow_from_json tool. Create RAG-optimized framework docs.
+Phase 4: Integration & Refinement: Build Generator Agent PoC, comprehensive testing, finalize documentation, refine error handling.
+8. Required Resources
+Personnel: 1-2 Python developers experienced with dawn, asyncio, API integration.
+Infrastructure: OpenAI API key & budget, development environment, test MCP servers/mocks. Version control (GitHub).
+9. Risks and Mitigation
+OpenAI API Changes/Costs: Monitor APIs, use SDKs, abstract interfaces. Document and manage costs.
+MCP Standard/Tooling Maturity: Start simple, rely on specs/examples, potentially contribute to MCP tooling.
+Async Complexity: Careful design and testing of async WMS core.
+JSON Generation Reliability: High-quality RAG docs, good prompting, validation step catches errors. Start with simpler workflow generations.
+Documentation Bootstrapping: Document core tools (VS, MCP) during Phases 1 & 2. Refine/optimize these docs for RAG before fully building the Generator Agent in Phase 4.
+10. Success Metrics
+Agents successfully use File Search on specified Vector Stores.
+Basic LTM storage and implicit retrieval functions as expected.
+Agents can discover and execute tools from a configured stdio MCP server.
+Valid workflow JSON can be generated (by PoC agent) based on natural language requests.
+The execute_workflow_from_json tool successfully validates, interprets, and runs generated JSON workflows.
+All features are documented with examples and covered by tests.
+11. Conclusion
+This PRD outlines an ambitious but logical evolution for the "dawn" framework. By adding context-awareness, MCP interoperability, and dynamic JSON workflow generation, "dawn" will become significantly more powerful, versatile, and aligned with the cutting edge of AI agent development. The phased approach allows for incremental delivery and manages complexity.
+Detailed TODO List: Dawn Framework Enhancements vNext
+This TODO list follows the logical phases outlined in the PRD roadmap.
+Phase 1: Foundation - Context-Awareness (Est. 3-4 Weeks)
+[ ] Setup & Branching:
+[ ] Create main feature branch (e.g., feature/dawn-enhancements-vnext).
+[ ] Update requirements.txt: ensure latest openai, add python-dotenv if not present.
+[ ] pip install -r requirements.txt.
+[ ] Configure OpenAI API key locally (.env).
+[ ] Vector Store Tool Implementation:
+[ ] Implement vector_store_create tool (tools/openai_vs/create.py).
+[ ] Implement upload_file_to_vector_store tool (tools/openai_vs/upload.py) including robust polling logic for file processing completion with timeouts and error handling.
+[ ] Implement save_text_to_vector_store tool (tools/openai_vs/save_text.py) using temporary files and the upload tool.
+[ ] Implement list_vector_stores tool (tools/openai_vs/list.py).
+[ ] Implement delete_vector_store tool (tools/openai_vs/delete.py).
+[ ] Register all new VS tools in core/tools/registry.py.
+[ ] Unit test each VS tool (mocking OpenAI API calls, file system, polling).
+[ ] File Search Integration:
+[ ] Modify Task class/definition to include use_file_search, file_search_vector_store_ids, file_search_max_results attributes/keys.
+[ ] Modify LLMInterface (or WMS execution step for LLMs) to:
+[ ] Accept new file search parameters.
+[ ] Construct tools parameter for client.responses.create with file_search config when requested.
+[ ] Correctly parse multi-part response (file_search_call, message).
+[ ] Extract text content and annotations (message.content[0].text.value, message.content[0].text.annotations).
+[ ] Store annotations appropriately (e.g., task.output_annotations).
+[ ] Update WMS variable substitution logic if needed to access output_annotations.
+[ ] Basic LTM Implementation:
+[ ] Add ltm_vector_store_id (optional) to Agent configuration/initialization.
+[ ] Ensure save_text_to_vector_store tool can use the agent's configured LTM ID.
+[ ] Ensure LLMInterface/WMS allows combining LTM VS ID with other VS IDs in file_search_vector_store_ids.
+[ ] Testing (Phase 1):
+[ ] Write integration tests for VS tool lifecycle (create->upload->list->delete). Requires OpenAI calls.
+[ ] Write integration test for file_search within a task, verifying output and annotation extraction.
+[ ] Write integration test demonstrating save_text_to_vector_store (LTM save) and subsequent retrieval via file_search.
+[ ] Documentation (Initial Core Tools - for Phase 3 RAG):
+[ ] Create initial markdown files documenting each new VS tool (vector_store_create, upload_file_to_vector_store, etc.), clearly specifying their tool_name and input_data structure.
+[ ] Document the new Task parameters for File Search (use_file_search, etc.).
+Phase 2: Extensibility - MCP Client (Est. 3-4 Weeks)
+[ ] Setup & Dependencies:
+[ ] Add any required MCP client or asyncio helper libraries to requirements.txt.
+[ ] MCP Configuration:
+[ ] Define and implement loading/validation for MCP server configurations (e.g., mcp_servers.yaml). Focus on stdio type.
+[ ] MCPClientManager Implementation:
+[ ] Create MCPClientManager class (core/mcp/manager.py).
+[ ] Implement async connection logic for stdio using asyncio.create_subprocess_exec.
+[ ] Implement sending/receiving basic MCP JSON messages (initialize, list_tools, call_tool request/response structure).
+[ ] Implement session state management (connecting, initialized, disconnected).
+[ ] Implement connection/startup logic tied to framework initialization.
+[ ] Implement graceful shutdown logic.
+[ ] MCPTool Wrapper:
+[ ] Create MCPTool class (core/tools/mcp_tool.py) inheriting from base Tool.
+[ ] Implement __init__, name, description properties.
+[ ] Implement/Adapt utility for dynamic Pydantic model generation from MCPToolInfo.inputSchema.
+[ ] Implement input_schema property using the utility.
+[ ] Implement async def _run(...) method: serialize input, call manager.call_tool(...), parse result, format output, handle errors.
+[ ] Dynamic Registration:
+[ ] Enhance MCPClientManager to call list_tools upon connection.
+[ ] Implement logic to iterate results, instantiate MCPTool wrappers, generate namespaced IDs, and register with ToolRegistry.
+[ ] Async WMS Core Update:
+[ ] CRITICAL: Refactor WMS task execution loop(s) to be async and correctly await tool calls (both regular sync tools and new async MCPTool). This might be a significant change depending on current structure.
+[ ] Testing (Phase 2):
+[ ] Unit test MCP config loading.
+[ ] Unit test dynamic Pydantic model generation for MCPTool.
+[ ] Unit/Integration test MCPClientManager connection and list_tools using a mock stdio server.
+[ ] Unit test MCPTool._run mocking the manager/session.
+[ ] Integration test: Connect to mock server, verify tool registration, execute a workflow task using the mock MCPTool.
+[ ] Documentation (Initial Core Tools - for Phase 3 RAG):
+[ ] Document MCP server configuration format.
+[ ] Document how discovered MCP tools are named in the registry.
+[ ] Provide a basic example of using an MCPTool in a task definition (even if just conceptual/using the mock tool).
+Phase 3: Meta-Capability - Dynamic Generation (JSON) (Est. 2-3 Weeks)
+[ ] JSON Schema Definition:
+[ ] Create and refine workflow_schema.json. Ensure it covers all necessary Workflow and Task parameters, including those from Phase 1 (File Search) and Phase 2 (MCPTool usage). Define variable syntax clearly.
+[ ] JSON Validation:
+[ ] Add jsonschema to requirements.txt.
+[ ] Implement validate_workflow_json(data: dict) utility function using the library and the schema file. Include good error reporting.
+[ ] JSON Interpretation:
+[ ] Implement load_workflow_from_dict(workflow_data: dict) -> Workflow function/method.
+[ ] Ensure robust mapping from dictionary keys to Workflow and Task attributes, including type checks and handling defaults.
+[ ] execute_workflow_from_json Tool:
+[ ] Implement the new tool (tools/core/execute_json.py?).
+[ ] Include steps: parse JSON, call validator, call interpreter, instantiate temporary Agent, run workflow, return result/status.
+[ ] Handle errors gracefully at each step.
+[ ] Register the tool in ToolRegistry.
+[ ] RAG-Optimized Framework Documentation:
+[ ] Review & Refine: Go over docs created in Phase 1 & 2. Ensure clarity, accuracy, and structure suitable for LLM processing via RAG.
+[ ] Add JSON Schema Doc: Explicitly include/document the workflow_schema.json content and explain its usage.
+[ ] Add Tool Input Schemas: Ensure docs for all tools clearly specify their input_data JSON schema.
+[ ] Add execute_workflow_from_json Doc: Document this new tool.
+[ ] Ingest Docs: Set up the process to create/update vs_dawn_framework_docs using the upload tool.
+[ ] Testing (Phase 3):
+[ ] Unit test validate_workflow_json with valid and invalid data.
+[ ] Unit test load_workflow_from_dict with various valid workflow structures. Test handling of missing optional fields or incorrect types if not caught by schema validation.
+[ ] Unit test execute_workflow_from_json tool (mocking validation, interpretation, and agent execution).
+[ ] Integration test: Provide valid workflow JSON to execute_workflow_from_json and verify the underlying workflow runs correctly. Test with invalid JSON.
+Phase 4: Integration & Refinement (Est. 2-3 Weeks)
+[ ] Workflow Generator Agent PoC:
+[ ] Define a new dawn workflow (e.g., workflow_generator.json or .py) that implements the 2-step LLM+RAG process described in the concept (Plan -> Generate JSON).
+[ ] Task 1 uses RAG on vs_dawn_framework_docs to plan.
+[ ] Task 2 uses RAG (esp. on JSON schema/examples) + plan to generate the workflow JSON string.
+[ ] (Optional) Add a final step that calls execute_workflow_from_json using the output of Task 2.
+[ ] End-to-End Testing:
+[ ] Test the Generator Agent PoC: Provide natural language prompts -> Verify generated JSON (manually inspect first) -> Verify execution via execute_workflow_from_json. Start with simple target workflows, then try more complex ones like the legal review example.
+[ ] Test workflows combining MCP tools and Context-Aware features.
+[ ] Final Documentation:
+[ ] Write comprehensive user guides for Context-Awareness, MCP Integration, and Dynamic JSON Generation.
+[ ] Create tutorials/examples demonstrating common use cases for each major feature.
+[ ] Update main README.md and project overview.
+[ ] Refinement & Bug Fixing:
+[ ] Address any bugs or inconsistencies found during testing.
+[ ] Refine error messages and logging based on testing experience.
+[ ] Optimize performance where necessary (e.g., caching generated Pydantic models for MCPTool).
+[ ] Code Review & Merge:
+[ ] Conduct final code reviews for all phases.
+[ ] Ensure test coverage is adequate.
+[ ] Merge feature branch into main.
+[ ] Prepare Release (Optional):
+[ ] Update version numbers.
+[ ] Generate release notes.
+[ ] Publish package if applicable.
+This detailed TODO list provides a structured approach. Remember that dependencies exist (e.g., you need VS tools working before LTM or the Generator Agent's RAG is fully functional). Address the "documentation bootstrapping" by documenting core tools as they are built in Phases 1 & 2, then refining those docs for the RAG needs in Phase 3 before tackling the Generator PoC in Phase 4.
