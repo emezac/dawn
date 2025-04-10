@@ -4,6 +4,7 @@ from openai import APIConnectionError, APIError, BadRequestError, RateLimitError
 
 from tools.file_read_tool import FileReadTool
 from tools.file_upload_tool import FileUploadTool
+from tools.openai_vs.create_vector_store import CreateVectorStoreTool
 from tools.vector_store_tool import VectorStoreTool
 from tools.web_search_tool import WebSearchTool
 from tools.write_markdown_tool import WriteMarkdownTool
@@ -31,6 +32,7 @@ class ToolRegistry:
         self.register_tool("file_read", self.file_read_tool_handler)
         self.register_tool("file_upload", self.file_upload_tool_handler)
         self.register_tool("vector_store_create", self.vector_store_create_tool_handler)
+        self.register_tool("create_vector_store", self.create_vector_store_handler)
         self.register_tool("write_markdown", self.write_markdown_tool_handler)
 
     def register_tool(self, name: str, func: Callable) -> None:
@@ -213,3 +215,18 @@ class ToolRegistry:
         result_path = write_tool.write_markdown_file(file_path, content)
         # Optional: Validate if path exists after writing?
         return result_path
+        
+    def create_vector_store_handler(self, **data) -> Any:
+        """Handler for the Create Vector Store tool."""
+        create_vs_tool = CreateVectorStoreTool()
+        name = data.get("name", "")
+        if not name:
+            raise ValueError("Missing 'name' parameter for vector store creation.")
+        
+        # Let create_vector_store raise exceptions directly to execute_tool
+        vs_id = create_vs_tool.create_vector_store(name)
+        
+        if not vs_id or not isinstance(vs_id, str) or not vs_id.startswith("vs_"):
+            raise ToolExecutionError(f"Invalid vector store ID format received: {vs_id}")
+            
+        return vs_id
