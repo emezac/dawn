@@ -1,3 +1,3 @@
 """
-OpenAI Vector Store tools package.
+OpenAI Vector Store tools for the Dawn AI Agent Framework.
 """

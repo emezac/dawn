@@ -1,0 +1,89 @@
+23 MCP STARTUP IDEAS TO BUILD IN 2025 (ai agents/ai/mcp ideas)
+
+1. PostMortemGuy – when your app breaks (bug, outage), MCP agent traces every log, commit, and Slack message. Full incident report in seconds. $50/incident. 
+
+2. ContextCaddy – agent that shadows founders, reads emails, meetings, tasks, docs. Gives daily summaries + next best actions. Your Chief of Staff, $99/month. 
+
+3. SmartIntern – MCP-based agent that joins your Slack and becomes a context-aware intern. Takes notes, sends follow-ups, surfaces insights. $20/user.
+
+4. BugWhisperer – Devs paste bug, agent traces from logs + context + previous fixes. Outputs GitHub issue + patch. $25/user.  Probably gets acquired by Microsoft.
+
+5. LegalMCP – feed in your internal docs. Agent becomes your in-house legal reviewer. Context-aware redlines. $2k/month.
+
+6. CodeWhisperer – onboards devs 10x faster by spinning up an agent trained on internal codebase, docs, and Slack threads.
+
+7. ProcureBot – understands your vendor history, budgets, needs. Runs RFPs autonomously. Saves $100k/year.
+
+8. TimeMachineAI – MCP agent that reconstructs product decisions over time. Useful for audits, onboarding, legacy code.
+
+9. AgentCRM – personal agent for each sales rep that remembers all deal context across meetings, emails, notes. Closes more, faster.
+
+10. MeetingSniper – MCP listens to Zoom calls and joins follow-up calls with perfect memory. No more context drops. $30/month. Probably gets acquired by Zoom or Google.
+
+11. MultiPersona – one agent, many hats. Marketing Greg, Legal Greg, Ops Greg. Context-aware mode switching.
+
+12. SmartCompliance – MCP agent that watches workflow tools and flags anything that violates SOC2, HIPAA, GDPR. $1k/month.
+
+13. DealDeskAI – MCP reads every deal, context, email chain. Creates optimal pricing/discount strategy. $3k/month.
+
+13. AgentRouter – infra tool that lets you assign tasks to the right agent based on context. Zapier for agent workflows.
+
+14. ZeroOnboarding – drop into any company. MCP-based agent gets context from files + apps. Ready to work Day 1.
+
+15. AIChangelog – MCP tracks what every AI agent does and why. Auditable changelog for agent teams.
+
+16. CustomerWhisperer – MCP agent reads every customer convo, CRM note, ticket. Tells you what to build next. $500/month.
+
+17. InboxGenie – Email client powered by MCP. Agent responds with full historical context, tone-matching, and strategic intent.
+
+18. AgentQA – QA tester that understands the full product roadmap, Figma files, and test history. Writes better tests than humans.
+
+19. AgentAPI – API for devs to quickly give any AI agent long-term memory + multi-context reasoning. Sell infra.
+
+20. PitchBot – Upload Notion or pitch doc, MCP agent builds personalized decks for every investor, prospect on your list. $500/month.
+
+21. AutoPilotForWork– MCP agent that spins up domain-specific copilots for any job function. Finance, ops, support. Plug & play.
+
+22. StartupHistorian – agent that reconstructs company history across emails, docs, tickets. Great for new execs, investors, or writing that S-1.
+
+23. HRRadar – agent trained on internal Slack + HR policies. Flags toxic dynamics early. Replaces anonymous feedback. $1k/month.
+
+MCPs change the game.
+Before: agents forgot everything.
+
+
+Based on dawn's core strengths:
+Explicit Workflow Management (WMS): Defining, running, and managing multi-step processes with conditions, parallelism, and feedback.
+Context-Awareness: Using Vector Stores for RAG (File Search) and Long-Term Memory (LTM).
+Tool Integration: Easily incorporating custom Python tools, web search, file operations, and soon, MCP tools.
+Here's an evaluation of which ideas are a perfect fit for dawn right now or with minimal additional tool development:
+Excellent Fits (Directly leverage Dawn's core strengths):
+#5 LegalMCP: (As demonstrated) This is a prime example. It heavily relies on feeding internal docs (RAG via Vector Stores), performing analysis (LLM tasks within a workflow), and maintaining context (potentially LTM for past reviews). dawn's WMS orchestrates the steps perfectly.
+#6 CodeWhisperer: Onboarding requires understanding a codebase (RAG via VS loaded with code/docs), documentation (RAG), and possibly Slack threads (RAG/Tool). An agent answering questions or generating starter code fits dawn's RAG + LLM + Workflow model very well. LTM could store developer preferences.
+#12 SmartCompliance: Similar to LegalMCP. An agent can use a workflow to: a) ingest data about another workflow/tool (input), b) use RAG (File Search) against compliance docs (SOC2, HIPAA stored in VS), c) use an LLM task to analyze risks based on retrieved context, d) use conditional logic in the workflow to flag violations or trigger alerts using tools.
+#2 ContextCaddy / #9 AgentCRM / #17 InboxGenie: These are variations on the theme of a highly context-aware personal assistant operating on specific data domains (founder's info, sales deals, email). They heavily rely on:
+LTM: Remembering past interactions, deal details, user preferences is crucial.
+RAG: Accessing relevant documents, emails, meeting notes stored in Vector Stores.
+Tool Integration: Connecting to email, calendar, CRM (likely via APIs wrapped as dawn tools or potentially MCP tools).
+WMS: Orchestrating tasks like "Summarize yesterday's meetings," "Draft follow-up email," "Update CRM."
+#14 ZeroOnboarding: The core idea is rapid context acquisition from files and apps to become productive. This directly maps to dawn's RAG capabilities (loading company docs into VS) and tool integration (connecting to apps). A workflow could guide the initial Q&A and task execution.
+#21 AutoPilotForWork: dawn could serve as the engine for these domain-specific copilots. You would define different workflows, pre-load domain-specific knowledge into Vector Stores, and equip the agent with relevant tools for each job function (Finance tools, Ops tools, etc.).
+Very Good Fits (Highly feasible, might need slightly more tool dev):
+#1 PostMortemGuy: Requires tools to access logs (various formats), Git history, and Slack. The core logic (tracing, correlating, reporting) is a multi-step workflow ideal for dawn. RAG/LTM helps find related past incidents.
+#3 SmartIntern: Needs strong Slack integration (Tool/MCP) and potentially meeting transcription tools. LTM and summarization fit well.
+#4 BugWhisperer: Needs tools for log analysis and potentially code analysis/patching, plus GitHub integration. The workflow fits, but tools are key.
+#8 TimeMachineAI / #22 StartupHistorian: Heavily reliant on RAG across diverse historical data (emails, docs, tickets). dawn's context-awareness is perfect, but requires robust tools to ingest data from various sources.
+#16 CustomerWhisperer: Similar to AgentCRM/ContextCaddy but focused on customer data. Needs integrations with support tickets, CRM, conversation platforms.
+Good Fits (Feasible but may require more specialized components or complex workflows):
+#7 ProcureBot: The workflow automation fits dawn, but requires robust tools for vendor DBs, budget systems, and potentially complex logic for RFP generation/analysis.
+#11 MultiPersona: dawn could handle this via different workflow initializations or conditional loading of prompts/tools/LTM subsets, managed by the WMS.
+#13 DealDeskAI: Requires strong data integration and potentially complex analytical models (maybe beyond standard LLM calls) integrated as tools.
+#18 AgentQA: The workflow fits, but reliable tools for interacting with Figma files or UI elements for testing can be challenging.
+#23 HRRadar: Needs good Slack integration and potentially specialized NLP models (integrated as tools) for detecting toxicity nuances beyond basic sentiment analysis. Requires careful ethical considerations.
+Why these are good fits:
+Your dawn framework, with its emphasis on structured workflows and context management (RAG/LTM), excels at tasks that involve:
+Orchestrating multiple steps: Fetch data -> Analyze -> Synthesize -> Decide -> Act.
+Integrating diverse information sources: Combining knowledge from documents (VS), real-time web data (Web Search), past interactions (LTM), and external systems (Tools/MCP).
+Maintaining context: Using LTM and retrieved documents to inform current actions and decisions.
+Adaptability: Using conditional logic within workflows based on intermediate results.
+The ideas ranked as "Excellent" or "Very Good" map most directly onto these strengths, requiring capabilities you've already built or planned (like robust RAG and LTM).

@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from openai import (  # Import necessary OpenAI classes
     APIConnectionError,
@@ -38,17 +38,27 @@ class LLMInterface:
             log_error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
             raise ConnectionError(f"Failed to initialize OpenAI client: {e}")
 
-    def execute_llm_call(self, prompt: str, system_message: str = "You are a helpful assistant.") -> Dict[str, Any]:
+    def execute_llm_call(
+        self,
+        prompt: str,
+        system_message: str = "You are a helpful assistant.",
+        use_file_search: bool = False,
+        file_search_vector_store_ids: Optional[List[str]] = None,
+        file_search_max_results: int = 5,
+    ) -> Dict[str, Any]:
         """
         Calls the configured OpenAI model with the given prompt and system message.
 
         Args:
             prompt: The user prompt for the LLM.
             system_message: The system message to guide the LLM's behavior.
+            use_file_search: Whether to use the file_search tool.
+            file_search_vector_store_ids: List of vector store IDs to search in.
+            file_search_max_results: Maximum number of search results to return.
 
         Returns:
             A dictionary containing:
-            {'success': True, 'response': str} on success, or
+            {'success': True, 'response': str, 'annotations': list} on success, or
             {'success': False, 'error': str} on failure.
         """
         if not prompt:
@@ -57,21 +67,41 @@ class LLMInterface:
 
         try:
             log_info(f"Sending prompt to model '{self.model}' (first 100 chars): {prompt[:100]}...")
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
+
+            request_params = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": system_message},
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=1500,  # Sensible default, make configurable if needed
-                temperature=0.7,  # Common default, make configurable if needed
-            )
+                "max_tokens": 1500,  # Sensible default, make configurable if needed
+                "temperature": 0.7,  # Common default, make configurable if needed
+            }
+
+            if use_file_search and file_search_vector_store_ids:
+                request_params["tools"] = [
+                    {
+                        "type": "file_search",
+                        "file_search": {
+                            "vector_store_ids": file_search_vector_store_ids,
+                            "max_results": file_search_max_results,
+                        },
+                    }
+                ]
+
+            response = self.client.chat.completions.create(**request_params)
+
+            annotations = []
 
             # Validate response structure and extract content
             if response.choices and response.choices[0].message and response.choices[0].message.content:
                 content = response.choices[0].message.content.strip()
+
+                if hasattr(response.choices[0].message, "annotations"):
+                    annotations = response.choices[0].message.annotations
+
                 log_info(f"Received response from model (first 100 chars): {content[:100]}...")
-                return {"success": True, "response": content}
+                return {"success": True, "response": content, "annotations": annotations}
             else:
                 # Handle cases where the API response structure is unexpected
                 error_msg = "LLM response object missing expected content structure."

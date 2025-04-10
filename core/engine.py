@@ -72,7 +72,14 @@ class WorkflowEngine:
         prompt = processed_input.get("prompt", "")
         if not prompt:
             return {"success": False, "error": "No prompt provided for LLM task"}
-        result = self.llm_interface.execute_llm_call(prompt)
+
+        result = self.llm_interface.execute_llm_call(
+            prompt=prompt,
+            use_file_search=task.use_file_search,
+            file_search_vector_store_ids=task.file_search_vector_store_ids,
+            file_search_max_results=task.file_search_max_results,
+        )
+
         if result["success"]:
             log_task_output(task.id, result)
             return result

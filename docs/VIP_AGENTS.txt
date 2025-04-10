@@ -1,0 +1,59 @@
+You'd vibe with this
+
+using your context-aware dawn framework to automatically generate the Python scripts that define specific dawn workflows, based on a natural language description of the desired outcome.
+Let's explore this concept of "VIP coding agents" building other agents/workflows on the fly.
+Concept:
+The core idea is to create a "Workflow Generator Agent" powered by dawn. This agent has specific knowledge about the dawn framework itself (its classes like Agent, Workflow, Task, available tools like vector_store_create, file_search, web_search, save_to_ltm, etc.). When a user provides a high-level goal (like analyzing legal documents), this agent uses its knowledge to dynamically construct the Python code defining the necessary dawn workflow, which can then be executed.
+Proposed Flow Breakdown:
+Phase 0: Knowledge Ingestion (One-time/Periodic Setup)
+Action: Use dawn's existing tools (upload_file_to_vector_store) to ingest key documentation and potentially core code snippets of the dawn framework itself into a dedicated Vector Store (e.g., vs_dawn_framework_docs).
+Content: This should include descriptions of Agent, Workflow, Task classes, their parameters (task_id, name, is_llm_task, tool_name, input_data, dependencies, use_file_search, file_search_vector_store_ids, etc.), and detailed documentation for all available tools (including their required input_data schema).
+Goal: Create a knowledge base the Workflow Generator Agent can query via RAG.
+Phase 1: User Request (Chat Interface)
+Action: The user interacts via a simple interface (CLI, web UI) and provides their goal in natural language.
+Example Input: "I have uploaded some legal documents into vector store 'vs_internal_legal_docs'. I want you to review a new draft contract (provided as input) against these documents, check for recent relevant California legal updates online, highlight any compliance issues or deviations from our internal standards, and save a report." (Or the simpler version: "I want to get the most important insight of these legal documents.")
+Phase 2: Workflow Script Generation (Core Meta-Agent Task)
+Action: Trigger the "Workflow Generator Agent". This agent executes a specialized dawn workflow internally.
+Internal Workflow (Conceptual):
+Task A (LLM + RAG):
+Input: User request (from Phase 1).
+Prompt: "Analyze the user's request: '[User Request]'. Based on the capabilities of the 'dawn' framework described in the provided context (Classes: Agent, Workflow, Task; Tools: file_search, web_search, vector_store_tools, save_to_ltm, etc.), identify the necessary sequence of tasks (potentially including parallel steps) and the specific tools required to achieve the user's goal. Extract key parameters mentioned like Vector Store IDs or specific inputs."
+RAG: Uses file_search against the vs_dawn_framework_docs Vector Store to retrieve relevant info about dawn classes and tools.
+Output: A structured plan or description of the required workflow steps and tools (e.g., "1. Extract topics (LLM). 2. Search internal docs (LLM+file_search on vs_internal_legal_docs). 3. Search web (web_search). 4. Synthesize (LLM+file_search on LTM). 5. Save summary (save_to_ltm). 6. Format report (write_markdown).").
+Task B (LLM + RAG):
+Input: The structured plan from Task A, original user request.
+Prompt: "Based on the following workflow plan: '[Plan from Task A]' and the user's original request, generate a complete Python script that defines this workflow using the 'dawn' framework classes (Workflow, Task). Import necessary modules. Instantiate the Workflow class. Create Task instances with appropriate parameters (task_id, name, tool_name/is_llm_task, input_data using f-strings or template variables like '{workflow_input[draft_contract]}' or '${task_id.output_data}', dependencies, parallel flags, file_search parameters if needed). Add each task to the workflow instance. Ensure the script is executable and defines a variable generated_workflow holding the Workflow object."
+RAG: Again, searches vs_dawn_framework_docs for precise class/parameter names and tool usage examples.
+Output: A string containing the generated Python code.
+Result: The output of this phase is the Python script string.
+Phase 3: Dynamic Execution
+Action: Take the generated Python script string from Phase 2 and execute it.
+Method: This requires careful handling. Options:
+exec(): Highly flexible but carries significant security risks if the generated code isn't strictly controlled or sandboxed.
+Write to File + Import: Write the script to a temporary .py file, then dynamically import it using importlib to get the generated_workflow object. Slightly safer than raw exec().
+Subprocess: Run the generated script as a separate Python subprocess. Captures output but might be harder to pass complex initial data.
+Instantiation: The executed script creates the Workflow object in memory.
+Agent Execution: Instantiate a standard dawn Agent, load the generated_workflow, provide necessary initial workflow_input (like the draft contract text), and call agent.run().
+Goal: Execute the dynamically defined workflow.
+Phase 4: Result Delivery
+Action: Capture the final result(s) from the executed workflow (e.g., the status, the path to the generated markdown report from the last task).
+Presentation: Display the result or the location of the report to the user via the chat interface.
+Exploration & Implications:
+Power & Flexibility: This approach is incredibly powerful. Users can generate complex, tailored workflows without writing Python code, simply by describing their goals. It makes the dawn framework highly adaptable.
+Accessibility: Lowers the barrier to entry for using dawn. Non-programmers could potentially define sophisticated agent behaviors.
+Rapid Prototyping: Quickly test different workflow structures for a given task by tweaking the natural language request.
+Self-Awareness: The framework gains a degree of self-awareness by having its own documentation ingested and usable for reasoning about its capabilities.
+Challenges & Considerations:
+Generation Reliability: The LLM's ability to generate correct, functional dawn Python code is the biggest hurdle.
+It might hallucinate parameters, use incorrect syntax, or misunderstand the relationships between tasks (dependencies, parallel execution).
+Mitigation: Excellent prompting, high-quality RAG context (very clear dawn docs are essential), potentially fine-tuning a model specifically for dawn code generation, providing examples within the prompt, or using a structured output format from the planning task (Task A) to guide the code generation task (Task B).
+Mapping Ambiguity: Translating vague user requests ("get insights") into concrete, multi-step workflows requires sophisticated planning by the LLM.
+Mitigation: The Workflow Generator Agent might need to ask clarifying questions back to the user if the request is too ambiguous, making Phase 2 more interactive.
+Dynamic Execution Security: Running dynamically generated code (exec, importlib) is inherently risky. A malicious user request could potentially lead to generated code that harms the system.
+Mitigation: Strong input validation on the user request, sandboxing the execution environment, limiting the capabilities/tools available to dynamically generated workflows, code analysis/validation before execution (difficult), or focusing on generating workflow definitions (like JSON/YAML) instead of raw Python, which a safer interpreter could then execute.
+Debugging: Debugging workflows generated dynamically will be challenging. Good logging within the generated workflow execution (Phase 3) and the generator agent itself (Phase 2) is critical.
+Context Window Limits: Providing sufficient context about dawn's features and the user's specific request to the LLM in Phase 2 might hit context window limits.
+Bootstrapping: Ensuring the vs_dawn_framework_docs is comprehensive and accurately reflects the framework's current capabilities is crucial.
+Conclusion:
+The "VIP coding agents" concept is a highly promising, albeit advanced, application of your dawn framework. It leverages its context-awareness in a "meta" way to automate the creation of workflows. While feasible, the main challenges lie in the reliability of the AI generating the code and the security of executing that code dynamically.
+Starting with generating simpler workflows or perhaps structured workflow definitions (like JSON) instead of raw Python might be a safer initial step. However, the potential to empower users to create complex agent behaviors through natural language is a compelling direction for the dawn framework.

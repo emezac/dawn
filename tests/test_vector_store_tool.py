@@ -1,7 +1,7 @@
 import os
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 # Add parent directory to path to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,8 +15,12 @@ class TestVectorStoreTool(unittest.TestCase):
         self.registry = ToolRegistry()
 
     @patch("tools.vector_store_tool.VectorStoreTool.create_vector_store")
-    def test_vector_store_create(self, mock_create_vector_store):
+    @patch("tools.vector_store_tool.OpenAI")
+    def test_vector_store_create(self, mock_openai, mock_create_vector_store):
         """Test the vector store create tool with a mocked API call."""
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        
         # Simulate a successful vector store creation returning "vs_test123"
         mock_create_vector_store.return_value = "vs_test123"
 
