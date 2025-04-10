@@ -2,6 +2,10 @@ from typing import Any, Dict, Optional
 
 
 class Task:
+    """
+    Represents a unit of work within a workflow with properties for status tracking,
+    input/output data, and execution control like retry logic and conditional branching.
+    """
     def __init__(
         self,
         task_id: str,
