@@ -1,6 +1,13 @@
 import unittest
-from core.tools.registry import ToolRegistry
+
+import sys
 import os
+# Add parent directory to path to import framework modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.tools.registry import ToolRegistry
+from tools.basic_tools import calculate, check_length
+from core.tools.registry import ToolRegistry
 
 class TestFileUploadTool(unittest.TestCase):
     def setUp(self):

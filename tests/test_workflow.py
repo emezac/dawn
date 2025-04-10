@@ -5,6 +5,14 @@ This module contains tests for the Workflow class functionality.
 """
 
 import unittest
+
+import sys
+import os
+# Add parent directory to path to import framework modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.tools.registry import ToolRegistry
+
 from core.task import Task
 from core.workflow import Workflow
 

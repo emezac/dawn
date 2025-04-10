@@ -1,6 +1,13 @@
 import unittest
 import os
+
+import sys
+import os
+# Add parent directory to path to import framework modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from core.tools.registry import ToolRegistry
+
 
 class TestWriteMarkdownTool(unittest.TestCase):
     def setUp(self):

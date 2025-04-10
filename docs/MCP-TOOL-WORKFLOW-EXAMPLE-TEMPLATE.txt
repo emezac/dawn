@@ -1,0 +1,159 @@
+iHypothetical MCP Server for Compliance Checks
+For this example, we need to define the MCP Server that the MCPTool will connect to.
+Server Name/Purpose: Compliance Checker Server
+Server Alias (for Dawn config): compliance
+Connection Type: stdio
+Command (Hypothetical): npx -y @compliance-protocols/checker-server
+Environment Variables (Hypothetical): Might require API keys or connection strings for internal knowledge bases used by the checker, e.g., COMPLIANCE_KB_API_KEY=...
+MCP Tool Exposed:
+Tool Name (on MCP Server): analyze_compliance_risk
+Description: "Analyzes a given tool description, data operation, or workflow step against specified compliance frameworks (SOC2, HIPAA, GDPR) using internal knowledge bases. Identifies potential risks or violations."
+Input Schema (Conceptual JSON Schema):
+{
+  "type": "object",
+  "properties": {
+    "item_description": {
+      "type": "string",
+      "description": "Detailed description of the tool, data operation, or workflow step being analyzed."
+    },
+    "data_involved": {
+       "type": "string",
+       "description": "Description of the type of data being processed (e.g., PII, PHI, financial data, user content, none)."
+    },
+    "compliance_frameworks": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["SOC2", "HIPAA", "GDPR"] },
+      "description": "List of compliance frameworks to check against."
+    }
+  },
+  "required": ["item_description", "data_involved", "compliance_frameworks"]
+}
+Use code with caution.
+Json
+Output (Conceptual CallToolResult.content):
+{
+  "assessment_id": "comp-check-12345",
+  "frameworks_checked": ["SOC2", "HIPAA", "GDPR"],
+  "risk_level": "Medium", // e.g., None, Low, Medium, High, Critical
+  "findings": [
+    {
+      "framework": "GDPR",
+      "risk": "Medium",
+      "finding": "The described operation involves storing user data. The description lacks specifics on data minimization and storage location, potentially violating GDPR principles.",
+      "recommendation": "Specify data fields being stored and ensure storage is in GDPR-compliant regions or has appropriate safeguards."
+    },
+    {
+      "framework": "SOC2",
+      "risk": "Low",
+      "finding": "Tool description mentions external API calls. Ensure appropriate security controls (authentication, logging) are in place for these calls.",
+      "recommendation": "Verify and document security measures for external API interactions."
+    }
+  ],
+  "summary": "Medium risk identified primarily related to GDPR data handling specifics. SOC2 requires verification of controls."
+}
+Use code with caution.
+Json
+Example Dawn Workflow: Compliance Check for a Workflow Step/Tool
+This workflow takes a description of a specific action (like a tool used in another workflow or a planned data operation) and checks it for compliance risks using the hypothetical MCP server.
+# --- Prerequisites ---
+# Assume:
+# 1. The "dawn" framework is configured to connect to an MCP server with alias 'compliance'.
+# 2. This 'compliance' server exposes the 'analyze_compliance_risk' tool.
+# 3. The 'dawn' ToolRegistry has successfully discovered and registered the tool as 'mcp:compliance:analyze_compliance_risk'.
+# 4. Workflow input contains the item to check:
+#    workflow_input = {
+#        "item_to_check": {
+#            "description": "A workflow step that takes user email address and user-uploaded PDF content, calls an external API ('VendorXSummarizer') to summarize the PDF, stores the summary linked to the email address in a US-based database, and then emails the summary back to the user.",
+#            "data_involved": "User Email (PII), User Uploaded PDF Content (Potentially Sensitive), Summary derived from content."
+#        }
+#    }
+
+compliance_check_workflow = [
+    # Task 1: Call the Compliance Checker Tool via MCP
+    {
+        "id": "task_1_analyze_risk",
+        "name": "Analyze Compliance Risk via MCP",
+        # Tool name format: mcp:<server_alias>:<mcp_tool_name>
+        "tool_name": "mcp:compliance:analyze_compliance_risk",
+        "input_data": {
+            # Map workflow input to the MCP tool's expected input schema
+            "item_description": "{workflow_input[item_to_check][description]}",
+            "data_involved": "{workflow_input[item_to_check][data_involved]}",
+            "compliance_frameworks": ["SOC2", "HIPAA", "GDPR"] # Specify frameworks to check
+        },
+        "dependencies": [],
+        "max_retries": 1 # Maybe retry once if connection fails
+    },
+
+    # Task 2: Evaluate Compliance Report using an LLM
+    {
+        "id": "task_2_evaluate_report",
+        "name": "Evaluate Compliance Findings",
+        "is_llm_task": True,
+        "input_data": {
+            "prompt": """Review the following compliance analysis report for the described workflow step:
+            --- ANALYSIS REPORT ---
+            {task_1_analyze_risk[output_data]}
+            --- END REPORT ---
+
+            Based *only* on the report's 'risk_level' and 'findings':
+            1. Summarize the main compliance concerns in one sentence.
+            2. Determine if immediate action or review by a human compliance officer is required. Answer with 'ACTION_REQUIRED' if risk_level is 'High' or 'Critical', or if any finding mentions potential PHI violation under HIPAA. Otherwise, answer 'REVIEW_RECOMMENDED' if risk level is 'Medium', or 'LOG_INFO' if risk level is 'Low' or 'None'.
+
+            Output format:
+            Summary: [Your one-sentence summary]
+            Action: [ACTION_REQUIRED | REVIEW_RECOMMENDED | LOG_INFO]
+            """
+        },
+        "dependencies": ["task_1_analyze_risk"],
+        # This task could potentially also search LTM for how similar findings were handled before
+        # "use_file_search": True,
+        # "file_search_vector_store_ids": ["{agent_config[ltm_vector_store_id]}"]
+    },
+
+    # Task 3 (Conditional): Log Critical Alert if High Risk Detected
+    {
+        "id": "task_3_log_alert",
+        "name": "Log Critical Compliance Alert",
+        "tool_name": "log_alert", # Assume a simple internal 'dawn' tool for logging/notifications
+        "input_data": {
+            "level": "CRITICAL",
+            "message": "Compliance check requires immediate action for item: {workflow_input[item_to_check][description]}. Assessment ID: {task_1_analyze_risk[output_data][assessment_id]}. Summary: {task_2_evaluate_report[output_data][Summary]}"
+        },
+        "dependencies": ["task_2_evaluate_report"],
+        # Condition: Execute only if the evaluation requires immediate action
+        "condition": {
+            "variable": "{task_2_evaluate_report[output_data][Action]}",
+            "operator": "equals",
+            "value": "ACTION_REQUIRED"
+        }
+    },
+
+     # Task 4 (Conditional): Log Info/Recommendation if Medium/Low Risk
+    {
+        "id": "task_4_log_info",
+        "name": "Log Compliance Review Recommendation",
+        "tool_name": "log_info", # Assume a simple internal 'dawn' tool for logging
+        "input_data": {
+            "level": "INFO",
+            "message": "Compliance check completed for item: {workflow_input[item_to_check][description]}. Assessment ID: {task_1_analyze_risk[output_data][assessment_id]}. Status: {task_2_evaluate_report[output_data][Action]}. Summary: {task_2_evaluate_report[output_data][Summary]}"
+        },
+        "dependencies": ["task_2_evaluate_report"],
+        # Condition: Execute only if action is NOT required (i.e., Review or Log Info)
+        "condition": {
+            "variable": "{task_2_evaluate_report[output_data][Action]}",
+            "operator": "not_equals",
+            "value": "ACTION_REQUIRED"
+        }
+    }
+]
+
+# --- Execution Notes ---
+# - The WMS uses the MCPTool registered as 'mcp:compliance:analyze_compliance_risk'.
+# - Task 1's output_data will contain the JSON structure returned by the MCP tool.
+# - Task 2 uses an LLM to interpret the structured JSON output from Task 1.
+# - Tasks 3 and 4 demonstrate conditional execution based on the LLM's evaluation, using hypothetical internal logging tools.
+# - Robust error handling would be needed for Task 1 (e.g., MCP server unavailable, tool execution error on the server).
+Use code with caution.
+Python
+This example showcases how MCPTool allows "dawn" to leverage specialized, external capabilities (like a complex compliance checker) without needing to implement the checker logic natively. The workflow orchestrates the call to the external tool and then uses internal LLM capabilities and conditional logic to process the results and take appropriate action.

@@ -1,0 +1,146 @@
+Based on your existing framework's focus on explicit workflow management and tool integration, the most natural way to incorporate these features is by treating Vector Stores and File Search as manageable resources and capabilities within your WMS. Long-term memory can be built using these primitives.
+Here's a PRD outlining the feature:
+Project Requirements Document (PRD): Context-Aware Agent Enhancements
+1. Executive Summary
+This document details the requirements for enhancing the "dawn" AI Agent Framework with context-awareness capabilities. This will be achieved by integrating Long-Term Memory (LTM) and Efficient File Search functionalities, leveraging OpenAI's Vector Stores, Embeddings, and File Search tools. The goal is to enable agents built with "dawn" to maintain context over extended interactions and efficiently retrieve relevant information from large document sets, significantly improving their performance and utility in knowledge-intensive tasks.
+2. Motivation and Problem to Solve
+Statelessness Limitation: Agents currently operate primarily on short-term context within a single workflow run. They lack the ability to "remember" past interactions, user preferences, or derived knowledge across different sessions or long workflows.
+Inefficient Knowledge Access: While the framework supports basic file reading, it lacks efficient mechanisms to search semantically through large volumes of documents or knowledge bases provided by the user. Existing file tools are not suitable for large-scale Retrieval-Augmented Generation (RAG).
+User Expectation: Modern AI applications are increasingly expected to be context-aware and knowledgeable. Integrating LTM and efficient RAG is crucial for building sophisticated agents.
+Leveraging OpenAI Primitives: OpenAI provides powerful building blocks (Vector Stores, File Search, Embeddings) specifically designed for these purposes. Integrating them into "dawn" offers a robust and scalable solution.
+3. Goals and Objectives
+Main Goal: Equip "dawn" agents with persistent memory and efficient knowledge retrieval capabilities.
+Key Objectives
+Integrate OpenAI Vector Stores:
+Implement mechanisms within the framework to manage Vector Stores (create, retrieve, delete).
+Allow association of Vector Stores with Agents or specific Workflows.
+Implement tools for adding/uploading files to specific Vector Stores.
+Implement File Search Capability:
+Integrate OpenAI's File Search tool (likely via the Responses API, as it fits the current model) into the framework's tool ecosystem or LLM interface.
+Allow tasks within a workflow to specify Vector Store(s) to search against.
+Handle citations and search results returned by the tool.
+Develop a Long-Term Memory (LTM) Module:
+Design and implement a basic LTM mechanism.
+Utilize a dedicated Vector Store as the backend for LTM, enabling semantic retrieval of past information.
+Define triggers/tasks for storing relevant information (e.g., conversation summaries, key facts, user preferences) into LTM.
+Define triggers/tasks for retrieving relevant memories to augment prompts or inform task execution.
+Enhance WMS and Agent Core:
+Modify Task definitions to include parameters for specifying Vector Stores or enabling LTM retrieval/storage.
+Update the Agent core or WMS to manage Vector Store resources and LTM interactions.
+Maintain Framework Philosophy: Ensure the integration aligns with "dawn's" principles of explicit workflow management and modular tool usage.
+4. Project Scope (Initial Version)
+Included
+Vector Store Management Tools:
+create_vector_store(name: str) -> vector_store_id
+upload_and_add_file_to_vector_store(vector_store_id: str, file_path: str) -> file_status (potentially polling for completion)
+(Maybe) list_vector_stores()
+(Maybe) delete_vector_store(vector_store_id: str)
+File Search Integration:
+Ability to configure the file_search tool in LLM calls via the LLMInterface or a dedicated task.
+Tasks can specify vector_store_ids to use for File Search.
+Processing/logging of file_search_call and message outputs (including annotations/citations).
+Basic Long-Term Memory (LTM) Module:
+Agent initialization can create/load a dedicated LTM Vector Store.
+New Task types or flags:
+retrieve_from_ltm(query: str, top_k: int = 3): Retrieves relevant memories.
+save_to_ltm(text_content: str): Stores information in LTM.
+Workflow logic must explicitly call these tasks. No automatic LTM injection in this phase.
+Workflow Definition Updates: Allow specifying vector_store_ids within task definitions that utilize File Search.
+Observability: Logging for Vector Store operations, File Search calls, and LTM interactions.
+Documentation: How to set up, configure, and use Vector Stores, File Search, and the LTM module within workflows.
+Examples: Demonstrate workflows using File Search on uploaded documents and basic LTM storage/retrieval.
+Unit Tests: For the new tools and LTM module interactions.
+Excluded (Future Considerations)
+Automatic LTM summarization or complex memory structuring.
+Automatic injection of LTM context into prompts (requires more sophisticated context management).
+Advanced Vector Store features (metadata filtering, custom chunking strategies beyond defaults).
+Using the Assistants API File Search (focus on integrating with the current direct API call model first).
+UI for managing Vector Stores or viewing memory.
+Complex strategies for managing multiple knowledge/memory stores simultaneously within a single task.
+Fine-tuning models based on retrieval results.
+5. Key Features in Detail
+5.1. Vector Store Management
+New tools will be added to the ToolRegistry.
+These tools interact with the OpenAI API to create/manage Vector Stores and upload files.
+The framework needs to handle potential asynchronous nature of file processing in Vector Stores (polling status).
+Vector Store IDs will likely be managed as configuration or state within the Agent or passed through workflow inputs.
+5.2. File Search Tool Integration
+The LLMInterface or the WMS execution step for LLM tasks needs modification.
+When a task requires File Search:
+The tools parameter in the OpenAI API call (Responses API create) must include the file_search configuration.
+The configuration must specify the vector_store_ids relevant for that task (obtained from the task definition).
+The framework should parse the response to extract both the model's text output and the file citations/annotations.
+Task Definition Example:
+{
+    "id": "task_query_docs",
+    "name": "Query Product Documentation",
+    "is_llm_task": True,
+    "input_data": {"prompt": "Based on the product docs, how does feature X work?"},
+    # New parameters:
+    "use_file_search": True,
+    "file_search_vector_store_ids": ["vs_abc123", "vs_def456"] # Provided via config or prior task
+    # Optional: file_search_max_results: 5
+}
+Use code with caution.
+Python
+5.3. Long-Term Memory (LTM) Module
+A standard Vector Store will be used for LTM. The Agent instance could manage its ID.
+save_to_ltm Task:
+Takes text input.
+Internally, this text needs to be added to the LTM Vector Store (potentially by creating a temporary file, uploading it, and adding it to the VS, then deleting the temp file, or using a more direct embedding/storage method if available/simpler).
+retrieve_from_ltm Task:
+Takes a search query.
+Challenge: The standard file_search tool works on user messages within an API call. Retrieving LTM before an LLM call might require a different approach.
+Option 1 (Simpler): Implement retrieval using direct Embedding creation + vector similarity search if a library/simple implementation is feasible (adds complexity).
+Option 2 (Using OpenAI Primitives): Create a temporary "query" thread/message using the LTM vector store, run file search on it, extract results, and then use those results in the actual LLM call for the main task. This leverages OpenAI's retrieval but adds overhead.
+Option 3 (Pragmatic First Step): The retrieve_from_ltm task could simply formulate a prompt for the next LLM task, instructing it to consider its memory. The actual retrieval happens implicitly if the LLM task also uses the LTM vector store via file_search. This is less explicit control.
+Recommendation for v1: Start with explicit save_to_ltm. For retrieval, focus on enabling LLM tasks to also search the LTM Vector Store via file_search alongside knowledge stores, using appropriate prompts. Explicit retrieval tasks (retrieve_from_ltm) can be deferred if too complex initially.
+5.4. WMS / Agent Integration
+The Agent needs configuration for its LTM Vector Store ID (if applicable).
+The WMS needs to correctly pass vector_store_ids and enable file_search for relevant LLM tasks based on the task definition.
+Handle outputs containing citations appropriately (e.g., log them, make them available for subsequent tasks).
+6. Technical Approach
+Language: Python (consistent with the existing framework).
+Core Library: openai Python SDK (latest version supporting Vector Stores and Responses API File Search).
+Vector Store Backend: OpenAI's managed Vector Stores.
+Design: Extend existing Agent, Task, Workflow, ToolRegistry, and LLMInterface classes/modules. Prioritize modularity for the LTM component.
+API Usage: Primarily OpenAI Responses API (client.responses.create) with the file_search tool, and the Vector Store management APIs (client.vector_stores.*, client.vector_stores.files.*, etc.).
+7. Development Phases and Roadmap (Example)
+Phase 1: Vector Store Management & Basic File Search (2-3 Sprints / 4-6 weeks)
+Implement create_vector_store, upload_and_add_file_to_vector_store tools.
+Integrate basic File Search into LLMInterface / task execution (configure tools, pass vector_store_ids).
+Basic testing with pre-existing Vector Stores.
+Initial documentation and examples for file search.
+Milestone: Agent can execute a workflow that searches files in a specified Vector Store.
+Phase 2: Long-Term Memory Foundation (2 Sprints / 4 weeks)
+Implement save_to_ltm task/logic (using a dedicated VS).
+Decide and implement the initial LTM retrieval strategy (e.g., allowing LLM tasks to search LTM VS via file search).
+Agent configuration for LTM Vector Store.
+Refine observability for LTM.
+Examples demonstrating saving and implicitly retrieving LTM.
+Milestone: Agent can persist information across runs (manually triggered) and use it contextually in subsequent LLM calls.
+Phase 3: Refinement, Testing, and Documentation (1-2 Sprints / 2-4 weeks)
+Add remaining Vector Store management tools (list, delete).
+Improve error handling and polling for file processing.
+Expand test coverage (integration tests).
+Write comprehensive documentation for all new features.
+Refine examples.
+Milestone: Context-Aware features are robustly implemented, documented, and tested. Ready for wider use.
+8. Required Resources
+Personnel: 1-2 Python developers familiar with the "dawn" framework and OpenAI APIs.
+Infrastructure: OpenAI API key with access to relevant models and sufficient credits/spending limit (Vector Stores incur storage costs). Development and testing environment.
+9. Risks and Mitigation
+OpenAI API Changes: APIs (especially around Vector Stores/File Search) might evolve. Mitigation: Use the official SDK, build abstraction layers, allocate time for potential refactoring.
+Cost Management: Vector Store storage incurs ongoing costs. Mitigation: Implement delete_vector_store tool, consider expiration policies (if available/needed), document costs clearly.
+File Processing Latency: Adding files to Vector Stores isn't instantaneous. Mitigation: Implement robust polling mechanisms in upload tools, design workflows to accommodate potential delays.
+Retrieval Relevance Tuning: Default File Search might not always return the most relevant chunks. Mitigation: Start with defaults, make max_num_results configurable. Advanced tuning (metadata, custom ranking) is out of scope for v1.
+Complexity of LTM Retrieval: Explicit, independent retrieval might be complex. Mitigation: Start with simpler implicit retrieval (searching LTM VS during LLM task) and iterate.
+10. Success Metrics
+Successful implementation of Vector Store management tools.
+Agents can successfully use the file_search tool with specified Vector Stores within workflows.
+Basic LTM storage (save_to_ltm) is functional.
+Context from LTM or File Search demonstrably influences agent responses in example workflows.
+Features are documented clearly with working examples.
+Unit and basic integration tests pass.
+11. Conclusion
+Integrating Long-Term Memory and efficient File Search using OpenAI Vector Stores represents a significant evolution for the "dawn" framework. It addresses key limitations of statelessness and inefficient knowledge access, paving the way for more sophisticated, context-aware AI agents. By following a phased approach and leveraging OpenAI's powerful primitives, we can deliver substantial value while maintaining the framework's core design principles.

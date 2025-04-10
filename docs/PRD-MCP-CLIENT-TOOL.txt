@@ -1,0 +1,143 @@
+Project Requirements Document (PRD): MCPTool Integration
+1. Executive Summary
+This document outlines the requirements for creating a new tool type within the "dawn" AI Agent Framework: the MCPTool. This tool will act as a bridge, enabling "dawn" agents to discover and interact with external tools exposed via the Model Context Protocol (MCP) standard (https://modelcontextprotocol.io/). By connecting to arbitrary MCP Servers, "dawn" agents can leverage a wider range of pre-existing or standardized capabilities (e.g., interacting with Slack, weather APIs, or other specialized services) without requiring native integration for each one. This significantly enhances the framework's extensibility and interoperability.
+2. Motivation and Problem to Solve
+Tool Ecosystem Expansion: Natively integrating every useful external tool or API into "dawn" is impractical and time-consuming.
+Interoperability: Standards like MCP aim to create common interfaces for AI models/agents to interact with tools. Supporting MCP allows "dawn" to participate in this ecosystem.
+Leveraging Existing Tools: Many useful tools might already be exposed via MCP servers (as seen in the Slack example). Integrating MCP provides immediate access to these tools.
+Reducing Integration Effort: Instead of writing custom wrappers for each external service, developers can potentially connect to an MCP server exposing multiple tools via a single integration point (MCPTool).
+Alignment with Modern AI Trends: Tool usage and standardized interaction protocols are becoming increasingly central to capable AI agents.
+3. Goals and Objectives
+Main Goal: Enable "dawn" agents to dynamically discover and execute tools hosted on external MCP Servers.
+Key Objectives
+Implement MCP Client Logic: Integrate functionality to connect to and communicate with MCP Servers using a supported transport protocol (e.g., stdio, potentially HTTP later).
+Develop MCP Tool Discovery: Create a mechanism to query an MCP Server for its available tools (list_tools equivalent).
+Create MCPTool Wrapper: Define a "dawn" Tool class (MCPTool) that dynamically represents a tool discovered via MCP.
+Dynamic Tool Registration: Integrate the discovered MCP tools into "dawn's" ToolRegistry so they can be referenced in workflows.
+Schema Handling: Automatically handle the input schemas provided by MCP tools, ideally using Pydantic for validation within "dawn".
+Tool Execution: Implement the logic within MCPTool's run method to call the corresponding tool on the MCP Server (call_tool equivalent) with validated arguments.
+Configuration: Provide a clear way to configure connections to different MCP Servers.
+4. Project Scope (Initial Version)
+Included
+MCP Client Session Management: A way to configure and manage active connections/sessions to one or more MCP Servers.
+Initial support for one connection method (e.g., stdio based on examples, requiring command and arguments configuration).
+Dynamic Tool Discovery Mechanism: Functionality to call list_tools on a configured MCP Server upon initialization or on demand.
+MCPTool Class: A "dawn" Tool implementation that:
+Is dynamically instantiated based on MCPToolInfo received from the server.
+Stores the MCP tool's name, description, and inputSchema.
+Dynamically generates a Pydantic model from the inputSchema for input validation (inspired by JSONSchemaModel.create).
+Implements the run method to serialize input, call session.call_tool on the MCP server, and deserialize the CallToolResult.
+Integration with ToolRegistry: A mechanism to automatically register discovered MCPTool instances into the framework's registry, likely namespaced to avoid conflicts (e.g., mcp:<server_alias>:<tool_name>).
+Configuration: Define how users specify MCP server connection details (e.g., via environment variables, a configuration file). Example: Server alias, connection type, command/args (for stdio), relevant environment variables.
+Basic Error Handling: Handle connection errors, tool discovery failures, call_tool errors, and schema validation errors.
+Documentation: Explain how to configure MCP servers and use MCPTools within "dawn" workflows.
+Examples: A simple example workflow demonstrating the use of an MCPTool (potentially using a mock or simple publicly available MCP server if possible, or the Slack example if setup is feasible).
+Unit Tests: For the MCPTool wrapper, schema generation, and potentially mocking MCP session interactions.
+Excluded (Future Considerations)
+Support for multiple MCP transport protocols simultaneously (e.g., HTTP, WebSockets) in the initial version.
+Advanced session management (e.g., automatic reconnection, lifecycle events).
+A graphical interface for managing MCP connections or browsing tools.
+Complex mapping between "dawn" internal types and MCP schema types beyond standard JSON-compatible structures.
+Support for MCP features beyond basic list_tools and call_tool (if any).
+Built-in MCP Server implementation within "dawn".
+Automatic retries or specific error handling patterns tailored per MCP tool.
+5. Key Features in Detail
+5.1. MCP Connection Configuration
+A configuration mechanism (e.g., YAML file, dedicated section in existing config) is needed.
+Must allow defining multiple MCP servers, each with an alias/ID.
+Each server config needs:
+type: stdio (initially)
+If type is stdio:
+command: The command to execute (e.g., npx).
+args: A list of arguments (e.g., ["-y", "@modelcontextprotocol/server-slack"]).
+env: A dictionary of environment variables needed by the server process.
+(Future) If type is http: url, headers, etc.
+5.2. MCP Client Manager / Session Handling
+A central component (e.g., MCPClientManager) responsible for:
+Reading the configuration.
+Establishing and maintaining connections/sessions (ClientSession equivalent) based on the config. Likely uses mcp.client.stdio.stdio_client for stdio type.
+Providing access to active sessions for tool discovery and execution.
+Handles startup and shutdown of connections. Should likely be initialized when the "dawn" framework/agent starts.
+5.3. Dynamic Tool Discovery and Registration
+On initialization, the MCPClientManager should connect to each configured server.
+For each successful connection, it should call the equivalent of session.list_tools().
+For each MCPToolInfo returned:
+Instantiate a "dawn" MCPTool wrapper.
+Generate a unique name for the tool registry (e.g., mcp:<server_alias>:<mcp_tool_name>).
+Register this wrapper instance into the main ToolRegistry.
+Handle cases where discovery fails for a server.
+5.4. MCPTool Wrapper Implementation
+Inherits from dawn's base Tool class.
+__init__: Takes the ClientSession instance and the MCPToolInfo object.
+name property: Returns the unique registry name (e.g., mcp:slack:slack_post_message).
+description property: Returns MCPToolInfo.description. Provides a fallback if missing.
+input_schema property:
+Lazily generates or retrieves a Pydantic BaseModel derived from MCPToolInfo.inputSchema.
+Leverages a utility similar to JSONSchemaModel.create from the beeai_framework example to convert JSON Schema to a Pydantic model dynamically.
+_run method (or equivalent in "dawn"):
+Receives input data already validated against the generated Pydantic model (handled by "dawn's" core tool execution logic).
+Uses its ClientSession instance to call session.call_tool(name=original_mcp_tool_name, arguments=validated_input.model_dump()).
+Processes the CallToolResult. The result.content is likely the data to return.
+Wraps the result in the expected "dawn" output format (e.g., JSONToolOutput or similar).
+Handles exceptions during the call_tool process.
+5.5. Workflow Integration
+Users define tasks in their workflows using the registered MCP tool names.
+Example Task Definition:
+{
+    "id": "task_send_slack",
+    "tool_name": "mcp:slack:slack_post_message", # <protocol>:<server_alias>:<mcp_tool_name>
+    "input_data": {
+        "channel": "#bee-playground",
+        "text": "Hello from Dawn framework via MCP!"
+        # Other arguments defined by the slack_post_message schema
+    },
+    "dependencies": [...]
+}
+Use code with caution.
+Python
+"dawn's" WMS executes this like any other tool, finding the MCPTool instance in the registry and calling its run method.
+6. Technical Approach
+Language: Python 3.x.
+Core Dependency: An MCP client library for Python. If a standard library like mcp-client exists and is suitable, use it. Otherwise, implement necessary client logic based on the MCP specification and the stdio_client example.
+Schema Handling: Pydantic for dynamic model creation from JSON Schema. Libraries like pydantic-loader or custom implementation inspired by beeai_framework might be needed.
+Concurrency: MCP interactions, especially stdio, are inherently asynchronous. The implementation should leverage asyncio. The MCPClientManager and MCPTool.run methods should be async. "dawn" framework's core execution loop needs to support awaiting tool execution.
+Design: Maintain modularity. Keep MCP-specific logic encapsulated within the MCPClientManager and MCPTool classes.
+7. Development Phases and Roadmap (Example)
+Phase 1: MCP Client Core & Connection (2-3 weeks)
+Implement/Adapt basic MCP ClientSession handling for stdio.
+Implement MCPClientManager to read config and establish stdio connections.
+Implement basic list_tools call.
+Setup testing with a mock or simple MCP server (if possible).
+Milestone: Can connect to a configured stdio MCP server and list its tools.
+Phase 2: MCPTool Wrapper & Execution (2-3 weeks)
+Implement the MCPTool class structure.
+Implement dynamic Pydantic model generation from JSON Schema.
+Implement the MCPTool._run method calling session.call_tool.
+Integrate dynamic registration into ToolRegistry.
+Develop workflow execution logic to handle async tool calls.
+Milestone: A "dawn" workflow can successfully execute a task using a discovered MCPTool.
+Phase 3: Refinement, Error Handling, Docs (1-2 weeks)
+Enhance error handling (connection, discovery, execution).
+Refine configuration loading and management.
+Write comprehensive documentation and examples.
+Improve test coverage, including integration tests.
+Milestone: MCPTool integration is robust, documented, and ready for use.
+8. Required Resources
+Personnel: 1 Python developer familiar with "dawn", asyncio, and ideally some experience with external processes or API integration.
+Infrastructure: Development environment, access to test MCP servers (potentially including setting up the @modelcontextprotocol/server-slack example locally if used for testing).
+Libraries: asyncio, pydantic, potentially an MCP client library or libraries for managing subprocesses (asyncio.create_subprocess_exec).
+9. Risks and Mitigation
+MCP Standard Maturity/Complexity: The MCP standard might be complex or have edge cases. Mitigation: Start with core functionality (list_tools, call_tool), rely on existing client implementations if possible, refer to MCP specification.
+Connection Stability (stdio): Managing external processes via stdio can be fragile. Mitigation: Implement robust process management, handle process termination/errors gracefully, log extensively. Consider adding HTTP support later for more robust connections.
+Schema Compatibility: JSON Schemas from MCP might not always translate perfectly to Pydantic or might be complex. Mitigation: Use robust schema conversion logic, handle validation errors clearly, document limitations.
+External Server Dependencies: The tool relies on external MCP servers being available and correctly configured. Mitigation: Clear documentation on server setup, robust error handling for connection/execution failures, encourage local testing where possible.
+Async Integration: Ensuring the "dawn" core correctly handles async tool execution might require refactoring. Mitigation: Plan for potential WMS adjustments, use asyncio best practices.
+10. Success Metrics
+Successfully connect to and discover tools from a configured stdio MCP server.
+Discovered tools are correctly registered in the dawn ToolRegistry.
+Input data for an MCPTool task is validated against the dynamically generated schema.
+Tasks using MCPTool execute successfully by calling the remote MCP tool.
+Results from the MCP tool are correctly returned and usable by subsequent tasks in the workflow.
+Clear documentation exists for configuration and usage.
+11. Conclusion
+Integrating MCPTool into the "dawn" framework is a strategic enhancement that significantly broadens the agent's capabilities through standardized interoperability. By allowing agents to leverage external tools exposed via MCP servers, "dawn" becomes more versatile and better equipped to handle complex, real-world tasks requiring interaction with diverse external systems. This feature aligns with industry trends and adds substantial value to the framework.

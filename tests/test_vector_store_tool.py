@@ -1,5 +1,11 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch 
+import sys
+import os
+# Add parent directory to path to import framework modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.tools.registry import ToolRegistry
 from core.tools.registry import ToolRegistry
 
 class TestVectorStoreTool(unittest.TestCase):

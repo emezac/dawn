@@ -1,0 +1,82 @@
+Detailed TODO List: Context-Aware Agent Enhancements
+This TODO list breaks down the implementation based on the PRD and groups tasks into logical sprints or phases.
+Sprint/Phase 1: Vector Store Management & Basic File Search (Est. 2-3 weeks)
+Setup & Dependencies:
+Update requirements.txt to include the latest openai SDK version.
+Verify API key setup (.env) and ensure necessary OpenAI permissions/limits for Vector Stores.
+Create new directories if needed (e.g., core/memory/, tools/openai_vs/).
+Vector Store Tools Implementation:
+Implement tools/openai_vs/create_vector_store.py:
+Function create_vector_store(name: str) -> str (returns vector_store_id).
+Handle OpenAI API call (client.vector_stores.create).
+Add error handling (API errors, invalid names).
+Implement tools/openai_vs/upload_file_to_vector_store.py:
+Function upload_and_add_file_to_vector_store(vector_store_id: str, file_path: str) -> dict (returns status/file ID).
+Handle file opening and uploading (client.files.create with purpose='assistants').
+Add file to Vector Store (client.vector_stores.files.create).
+Implement Polling: Use client.vector_stores.files.retrieve or potentially client.vector_stores.file_batches.retrieve (if batching) in a loop with delays to wait for file processing status (completed, failed). Define timeout.
+Add robust error handling (file not found, upload errors, VS errors, polling timeout).
+Register these new tools in core/tools/registry.py.
+Framework Integration (File Search):
+Modify LLMInterface (or equivalent execution logic):
+Update the method making the OpenAI call (client.responses.create).
+Accept optional parameters: use_file_search: bool, file_search_vector_store_ids: list[str], file_search_max_results: int.
+If use_file_search is True, construct the tools parameter with the file_search tool configuration, including vector_store_ids.
+Parse the response structure from the Responses API when file_search is used (it returns multiple output items: file_search_call and message).
+Extract the main text content (message.content[0].text.value).
+Extract file citations/annotations (message.content[0].text.annotations) and store them (e.g., in task.output_annotations).
+Modify Task structure (class or dict definition):
+Add fields: use_file_search (boolean, optional), file_search_vector_store_ids (list, optional), file_search_max_results (int, optional).
+Update WMS execution logic:
+When executing an LLM task, check for the new Task fields.
+Pass these parameters correctly to the modified LLMInterface call.
+Store annotations alongside output_data.
+Testing:
+Unit test create_vector_store tool (mock OpenAI API).
+Unit test upload_and_add_file_to_vector_store tool (mock API, file system, polling).
+Write a simple integration test workflow: Create VS -> Upload File -> Run Task using File Search -> Verify output/annotations. Requires actual OpenAI calls.
+Documentation:
+Add initial notes to README or docs/ on Vector Store setup and basic File Search usage in tasks.
+Sprint/Phase 2: Long-Term Memory (LTM) Implementation (Est. 2 weeks)
+LTM Configuration & Agent Setup:
+Decide how Agent instances will manage their LTM Vector Store ID (e.g., loaded from config, passed during init, created on first use).
+Update Agent class __init__ or add a setup method to handle LTM VS ID. Optionally include logic to create the LTM VS if it doesn't exist using the create_vector_store tool.
+LTM Storage Tool Implementation:
+Implement tools/openai_vs/save_text_to_vector_store.py (or similar name for the save_to_ltm tool):
+Function save_text_to_vector_store(vector_store_id: str, text_content: str) -> dict.
+Strategy: Create a temporary text file with text_content -> Call upload_and_add_file_to_vector_store using the temp file -> Delete the temporary file.
+Add error handling for file operations and the upload tool call.
+Register the save_to_ltm tool in core/tools/registry.py.
+LTM Retrieval (Implicit via File Search):
+Ensure the WMS/LLMInterface modifications from Phase 1 correctly handle passing multiple vector_store_ids (e.g., knowledge base VS + LTM VS) to the file_search tool.
+Update Task definition documentation/examples to show how to include the agent's LTM VS ID in file_search_vector_store_ids for relevant tasks.
+Testing:
+Unit test the save_to_ltm tool (mocking dependencies).
+Integration test: Workflow saves info to LTM -> Separate workflow run retrieves/uses that info via File Search on the LTM VS.
+Documentation:
+Explain the LTM concept within the framework.
+Document Agent configuration for LTM.
+Document the save_to_ltm tool.
+Provide examples of using LTM implicitly with File Search.
+Sprint/Phase 3: Refinement, Robustness & Examples (Est. 1-2 weeks)
+Vector Store Management Tools (Enhancements):
+Implement list_vector_stores tool.
+Implement delete_vector_store tool.
+Register and test these tools.
+Robustness & Error Handling:
+Review and enhance error handling across all new tools and framework modifications (e.g., API rate limits, invalid IDs, VS states).
+Refine polling logic in the upload tool (e.g., exponential backoff, clearer status reporting).
+Observability:
+Add specific logging for VS operations (create, upload, delete), File Search calls (including VS IDs used), LTM saves, and citation extraction.
+Integration Testing:
+Create and test the full "Legal Contract Reviewer" example workflow.
+Test workflows combining conditional logic, parallel execution (if implemented), File Search, and LTM.
+Documentation:
+Finalize all documentation for Context-Aware features.
+Ensure clear API references for new tools and task parameters.
+Refine and add more examples.
+Code Review & Cleanup:
+Conduct thorough code reviews.
+Refactor where necessary for clarity and maintainability.
+Ensure consistent coding style.
+This detailed list provides a roadmap for incrementally building the context-aware capabilities into your "dawn" framework. Remember to adapt based on discoveries made during implementation. 

@@ -1,0 +1,111 @@
+# --- Prerequisites ---
+# Assume:
+# 1. An OpenAI Vector Store named "Internal Legal Docs" exists with ID 'vs_legal_guidelines'.
+# 2. An OpenAI Vector Store for Long-Term Memory exists with ID 'vs_agent_ltm'.
+# 3. The draft contract text is provided as initial input to the workflow, e.g., workflow_input['draft_contract']
+# 4. The Agent is configured with its LTM Vector Store ID: agent_config['ltm_vector_store_id'] = 'vs_agent_ltm'
+
+legal_review_workflow = [
+    # Task 1: Extract key topics/clauses from the draft contract for focused search
+    {
+        "id": "task_1_extract_topics",
+        "name": "Extract Contract Topics",
+        "is_llm_task": True,
+        "input_data": {
+            "prompt": "Identify the main legal topics or clause types present in this contract draft:\n\n{workflow_input[draft_contract]}\n\nList them concisely."
+        },
+        "dependencies": [],
+        # This task could potentially also search LTM for similar past contracts if needed
+        # "use_file_search": True,
+        # "file_search_vector_store_ids": ["{agent_config[ltm_vector_store_id]}"]
+    },
+
+    # Task 2 (Parallel): Search Internal Legal Documents based on draft content
+    {
+        "id": "task_2_search_internal_docs",
+        "name": "Search Internal Legal Guidelines",
+        "is_llm_task": True,  # Using LLM+FileSearch tool
+        "input_data": {
+            "prompt": "Based *only* on the provided internal legal documents, retrieve relevant guidelines, standard clauses, and potential compliance issues related to the following topics found in a draft contract: {task_1_extract_topics[output_data]}. Also check guidelines relevant to the overall contract structure if applicable."
+        },
+        "dependencies": ["task_1_extract_topics"],
+        "use_file_search": True,
+        "file_search_vector_store_ids": ["vs_legal_guidelines"], # Specific Knowledge Base
+        "parallel": True # Can run alongside web search
+    },
+
+    # Task 3 (Parallel): Search Web for Recent Legal Updates related to contract topics
+    {
+        "id": "task_3_search_web_updates",
+        "name": "Search Web for Recent Legal Updates",
+        "tool_name": "web_search", # Using the dedicated web search tool
+        "input_data": {
+            "query": "Recent legal updates or notable court rulings in [Jurisdiction, e.g., California] concerning contract clauses related to: {task_1_extract_topics[output_data]}",
+            # Optional: "context_size": "medium"
+        },
+        "dependencies": ["task_1_extract_topics"],
+        "parallel": True # Can run alongside internal doc search
+    },
+
+    # Task 4 (Sequential - Synchronization Point): Synthesize and Generate Redlines
+    {
+        "id": "task_4_synthesize_and_redline",
+        "name": "Synthesize Findings and Generate Redlines",
+        "is_llm_task": True,
+        "input_data": {
+            "prompt": """Review the following draft contract:
+            --- DRAFT CONTRACT ---
+            {workflow_input[draft_contract]}
+            --- END DRAFT CONTRACT ---
+
+            Consider the following context:
+            1. Internal Legal Guidelines Summary: {task_2_search_internal_docs[output_data]}
+            2. Recent Web Updates Summary: {task_3_search_web_updates[output_data]}
+            3. (Implicit Context) Relevant past interactions or preferences from long-term memory.
+
+            Your task is to act as an in-house legal reviewer. Identify specific clauses in the draft contract that deviate from our internal guidelines or are potentially impacted by recent web updates.
+            Generate specific, actionable redline suggestions for these clauses. For each suggestion, briefly cite the reason (e.g., "Internal Guideline Section 3.2", "Recent Update on [Topic]").
+            If a clause is compliant or standard, note that.
+            If the overall contract seems compliant based on the provided context, state "Overall compliant".
+            Focus ONLY on the information retrieved from internal docs and web search. Do not add general legal advice.
+            """,
+            # Note: If LTM retrieval was explicit, its output would be another input here.
+        },
+        "dependencies": ["task_2_search_internal_docs", "task_3_search_web_updates"], # Waits for parallel tasks
+        "use_file_search": True, # Allows searching LTM during synthesis
+        "file_search_vector_store_ids": ["{agent_config[ltm_vector_store_id]}"], # Access LTM here
+        "parallel": False # Must run after dependencies complete
+    },
+
+    # Task 5: Save Summary to Long-Term Memory
+    {
+        "id": "task_5_save_to_ltm",
+        "name": "Save Review Summary to LTM",
+        "tool_name": "save_to_ltm", # New tool to interact with LTM Vector Store
+        "input_data": {
+            "text_content": "Contract review performed for draft: '{workflow_input[draft_contract][:100]}...'. Key findings/Redlines: {task_4_synthesize_and_redline[output_data][:500]}..." # Create a concise summary
+        },
+        "dependencies": ["task_4_synthesize_and_redline"],
+        "parallel": False
+    },
+
+    # Task 6: Final Output Formatting (Optional)
+    {
+        "id": "task_6_format_output",
+        "name": "Format Final Review Report",
+        "tool_name": "write_markdown", # Example: use a tool to format the output
+        "input_data": {
+            "file_path": "contract_review_report.md",
+            "content": "# Contract Review Report\n\n## Draft Contract Snippet\n```\n{workflow_input[draft_contract][:500]}...\n```\n\n## Review Findings & Redlines\n{task_4_synthesize_and_redline[output_data]}\n\n*Internal Guidelines Citations: {task_2_search_internal_docs[output_annotations]}*\n*LTM Context Used: Yes/No based on task 4 annotations*"
+        },
+        "dependencies": ["task_4_synthesize_and_redline", "task_5_save_to_ltm"],
+         "parallel": False
+    }
+]
+
+# --- Execution Notes ---
+# - The WMS needs to handle the `parallel` flag and dependency resolution.
+# - The LLMInterface/WMS needs to correctly format the `tools` and `tool_resources` parameters for OpenAI API calls when `use_file_search` is True.
+# - The WMS needs to parse the file citations (`annotations`) from the File Search results (e.g., task_2 and task_4).
+# - The `save_to_ltm` tool needs to be implemented to interact with the agent's configured LTM Vector Store.
+# - Variable substitution (e.g., `{task_1_extract_topics[output_data]}`) is crucial.

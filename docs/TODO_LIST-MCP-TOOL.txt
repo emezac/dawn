@@ -1,0 +1,81 @@
+Detailed TODO List: MCPTool Integration
+Phase 1: MCP Client Core & Connection (Est. 2-3 Weeks)
+Project Setup & Dependencies:
+Create Feature Branch: Create a new git branch for this feature (e.g., feature/mcp-tool).
+Update Dependencies: Add necessary libraries to requirements.txt. Potential candidates:
+A Python MCP client library (if a suitable one exists).
+If implementing stdio manually: libraries for async subprocess management (asyncio).
+Confirm pydantic is present and up-to-date.
+Install Dependencies: pip install -r requirements.txt in the virtual environment.
+Configuration:
+Define Config Structure: Decide on the format and location for MCP server configurations (e.g., a dedicated mcp_servers.yaml, a section in existing config). Define fields clearly (alias, type=stdio, command, args, env).
+Implement Config Loading: Create a utility or class method to load and validate this configuration at framework startup.
+MCP Client & Session Management (stdio focus):
+Design MCPClientManager: Create a central class (core/mcp/manager.py?) responsible for managing MCP connections.
+Implement Stdio Connection Logic: Within MCPClientManager, implement async function to establish connection using asyncio.create_subprocess_exec (or an MCP library's equivalent like stdio_client).
+Handle process startup, capture stdin, stdout, stderr.
+Implement logic to send/receive MCP messages (JSON encoding/decoding over stdio).
+Implement Session Handling: Wrap the connection logic to represent an active ClientSession (conceptually).
+Implement initialize Call: Send the MCP initialize message upon successful connection. Handle the response.
+Implement list_tools Call: Create an async method in MCPClientManager or ClientSession to send the list_tools request and parse the ToolsResult.
+Implement Connection Lifecycle: Handle connection startup during framework initialization and graceful shutdown (terminating subprocesses).
+Basic Error Handling & Logging:
+Add try...except blocks for process creation errors, connection failures.
+Add basic logging for connection attempts, success, failure, and received list_tools data.
+Testing (Phase 1):
+Unit Test Config Loading: Test loading valid and invalid configurations.
+Mock MCP Server (stdio): Create a simple Python script that mimics basic MCP stdio behavior (responds to initialize, list_tools with predefined data).
+Unit/Integration Test Connection: Test MCPClientManager's ability to connect to the mock server, send initialize, send list_tools, and receive expected responses. Test connection failure scenarios.
+Phase 2: MCPTool Wrapper & Execution (Est. 2-3 Weeks)
+MCPTool Class Definition:
+Create Class Structure: Define MCPTool class (core/tools/mcp_tool.py?) inheriting from the framework's base Tool class.
+Implement __init__: Takes ClientSession (or manager access) and MCPToolInfo as input. Store necessary data (original name, description, schema, session).
+Implement name Property: Return the unique registry name (e.g., mcp:<alias>:<original_name>).
+Implement description Property: Return MCPToolInfo.description with a fallback.
+Dynamic Schema Handling:
+Implement JSON Schema to Pydantic Utility: Create or adapt a utility function/class (core/utils/schema_parser.py?) to dynamically generate Pydantic BaseModel classes from JSON Schema dictionaries (MCPToolInfo.inputSchema). Handle common types (string, number, boolean, array, object) and required fields. Consider edge cases or complex schemas.
+Implement input_schema Property: In MCPTool, implement this property to return the dynamically generated Pydantic model type. Cache the generated model for efficiency.
+Tool Execution Logic:
+Implement _run Method: Define the async def _run(...) method according to the base Tool signature.
+Input Serialization: The input will likely be a Pydantic model instance (validated by the framework). Use .model_dump(exclude_none=True) or similar to get a dictionary suitable for MCP arguments.
+Implement call_tool: Use the stored ClientSession to send the call_tool request to the MCP server, passing the original tool name and the serialized arguments dictionary. await the response.
+Response Handling: Parse the CallToolResult. Extract the relevant content.
+Output Formatting: Wrap the content in the framework's standard tool output format (e.g., JSONToolOutput(content)).
+Execution Error Handling: Add try...except around the call_tool interaction. Handle MCP errors returned in the result, connection errors, timeouts.
+Tool Registration:
+Modify MCPClientManager: After successfully calling list_tools for a server:
+Iterate through the returned MCPToolInfo list.
+Instantiate an MCPTool for each.
+Generate the unique namespaced ID.
+Register the MCPTool instance with the framework's central ToolRegistry.
+Handle potential name collisions during registration.
+Asynchronous WMS/Agent Core:
+Review Execution Loop: Critically examine the part of the WMS or Agent that executes tools.
+Modify for async: Ensure the loop can correctly identify async tool _run methods and use await to call them. This might involve making the main execution loop(s) async.
+Testing (Phase 2):
+Unit Test Schema Generation: Test the utility with various valid and invalid JSON schemas.
+Unit Test MCPTool._run: Mock the ClientSession and call_tool interaction. Test input serialization, response parsing, and error handling within _run.
+Integration Test Registration: Verify that tools from the mock MCP server are correctly registered with the expected namespaced IDs in the ToolRegistry.
+Integration Test Execution: Create a simple workflow that calls a tool on the mock MCP server via the registered MCPTool. Verify input validation, execution flow, and output.
+Phase 3: Refinement, Error Handling, Docs & Examples (Est. 1-2 Weeks)
+Error Handling & Robustness:
+Review Stdio Stability: Add handling for unexpected process termination or unresponsive servers. Implement timeouts for MCP calls (call_tool, list_tools).
+Refine Error Reporting: Ensure errors from MCP connections, discovery, or tool calls are propagated clearly within the framework (e.g., marking tasks as failed with informative messages).
+Handle cases where inputSchema is missing or invalid in MCPToolInfo.
+Observability:
+Add Detailed Logging: Implement logging within MCPClientManager (connection lifecycle, discovery results), MCPTool (call start/end, input args, output/error results), and schema generation utility.
+Documentation:
+Write Configuration Guide: Explain the mcp_servers.yaml (or chosen format) structure and options (stdio, command, args, env).
+Write Usage Guide: Explain how discovered MCP tools are named and how to use them in workflow task definitions.
+Document MCPTool Internals (Optional): Briefly explain how it works for contributors.
+Examples:
+Create Simple Example: A basic workflow using a mock MCP server tool (e.g., an echo tool).
+Implement Compliance Checker Example: Create the full workflow from the previous response. Requires setting up the hypothetical (or a real, if possible) compliance checker MCP server for testing.
+Update README: Add a section about MCPTool support.
+Code Quality & Finalization:
+Conduct Code Review: Review all new code related to MCP integration.
+Refactor: Improve code clarity, structure, and efficiency based on review feedback.
+Check Style: Ensure code conforms to project style guidelines (e.g., using black, flake8, mypy).
+Final Testing: Run all unit and integration tests. Manually test the example workflows.
+Merge Branch: Merge the feature branch into the main development branch.
+This detailed list covers the necessary steps from setup to final polish. Remember to adjust timings and specific implementation details based on the existing "dawn" framework's architecture and any challenges encountered.
