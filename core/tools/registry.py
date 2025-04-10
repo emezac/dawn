@@ -31,6 +31,10 @@ class ToolRegistry:
         self.register_tool("file_read", self.file_read_tool_handler)
         self.register_tool("file_upload", self.file_upload_tool_handler)
         self.register_tool("vector_store_create", self.vector_store_create_tool_handler)
+        self.register_tool("upload_file_to_vector_store", self.upload_file_to_vector_store_tool_handler)
+        self.register_tool("save_to_ltm", self.save_to_ltm_tool_handler)
+        self.register_tool("list_vector_stores", self.list_vector_stores_tool_handler)
+        self.register_tool("delete_vector_store", self.delete_vector_store_tool_handler)
         self.register_tool("write_markdown", self.write_markdown_tool_handler)
 
     def register_tool(self, name: str, func: Callable) -> None:
@@ -213,3 +217,52 @@ class ToolRegistry:
         result_path = write_tool.write_markdown_file(file_path, content)
         # Optional: Validate if path exists after writing?
         return result_path
+
+    def upload_file_to_vector_store_tool_handler(self, **data) -> Any:
+        """Handler for the Upload File to Vector Store tool."""
+        from tools.openai_vs.upload_file_to_vector_store import UploadFileToVectorStoreTool
+
+        upload_tool = UploadFileToVectorStoreTool()
+        vector_store_id = data.get("vector_store_id", "")
+        file_path = data.get("file_path", "")
+
+        if not vector_store_id:
+            raise ValueError("Missing 'vector_store_id' for file upload to vector store.")
+        if not file_path:
+            raise ValueError("Missing 'file_path' for file upload to vector store.")
+
+        return upload_tool.upload_and_add_file_to_vector_store(vector_store_id, file_path)
+
+    def save_to_ltm_tool_handler(self, **data) -> Any:
+        """Handler for the Save to LTM tool."""
+        from tools.openai_vs.save_text_to_vector_store import SaveTextToVectorStoreTool
+
+        save_tool = SaveTextToVectorStoreTool()
+        vector_store_id = data.get("vector_store_id", "")
+        text_content = data.get("text_content", "")
+
+        if not vector_store_id:
+            raise ValueError("Missing 'vector_store_id' for saving to LTM.")
+        if not text_content:
+            raise ValueError("Missing 'text_content' for saving to LTM.")
+
+        return save_tool.save_text_to_vector_store(vector_store_id, text_content)
+
+    def list_vector_stores_tool_handler(self, **data) -> Any:
+        """Handler for the List Vector Stores tool."""
+        from tools.openai_vs.list_vector_stores import ListVectorStoresTool
+
+        list_tool = ListVectorStoresTool()
+        return list_tool.list_vector_stores()
+
+    def delete_vector_store_tool_handler(self, **data) -> Any:
+        """Handler for the Delete Vector Store tool."""
+        from tools.openai_vs.delete_vector_store import DeleteVectorStoreTool
+
+        delete_tool = DeleteVectorStoreTool()
+        vector_store_id = data.get("vector_store_id", "")
+
+        if not vector_store_id:
+            raise ValueError("Missing 'vector_store_id' for vector store deletion.")
+
+        return delete_tool.delete_vector_store(vector_store_id)

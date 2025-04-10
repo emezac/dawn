@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 class Task:
@@ -6,6 +6,7 @@ class Task:
     Represents a unit of work within a workflow with properties for status tracking,
     input/output data, and execution control like retry logic and conditional branching.
     """
+
     def __init__(
         self,
         task_id: str,
@@ -18,12 +19,16 @@ class Task:
         next_task_id_on_failure: Optional[str] = None,
         condition: Optional[str] = None,
         parallel: bool = False,
+        use_file_search: bool = False,
+        file_search_vector_store_ids: Optional[List[str]] = None,
+        file_search_max_results: int = 5,
     ):
         self.id = task_id
         self.name = name
         self.status = "pending"
         self.input_data = input_data or {}
         self.output_data = {}
+        self.output_annotations = []
         self.is_llm_task = is_llm_task
         self.tool_name = tool_name
         self.retry_count = 0
@@ -32,6 +37,9 @@ class Task:
         self.next_task_id_on_failure = next_task_id_on_failure
         self.condition = condition
         self.parallel = parallel
+        self.use_file_search = use_file_search
+        self.file_search_vector_store_ids = file_search_vector_store_ids or []
+        self.file_search_max_results = file_search_max_results
 
         if not self.is_llm_task and not self.tool_name:
             raise ValueError("Non-LLM tasks must specify a tool_name")
@@ -53,6 +61,7 @@ class Task:
 
     def set_output(self, data: Dict[str, Any]) -> None:
         self.output_data = data
+        self.output_annotations = data.get("annotations", [])
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -69,6 +78,10 @@ class Task:
             "next_task_id_on_failure": self.next_task_id_on_failure,
             "condition": self.condition,
             "parallel": self.parallel,
+            "use_file_search": self.use_file_search,
+            "file_search_vector_store_ids": self.file_search_vector_store_ids,
+            "file_search_max_results": self.file_search_max_results,
+            "output_annotations": self.output_annotations,
         }
 
     def __repr__(self) -> str:
