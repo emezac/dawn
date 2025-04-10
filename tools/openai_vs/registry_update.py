@@ -29,8 +29,8 @@ def create_vector_store_handler(**data):
     """
     tool = CreateVectorStoreTool()
     name = data.get("name", "")
-    
+
     if not name:
         raise ValueError("Missing 'name' parameter for vector store creation.")
-    
+
     return tool.create_vector_store(name)

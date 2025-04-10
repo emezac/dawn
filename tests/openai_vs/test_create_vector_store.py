@@ -52,7 +52,7 @@ class TestCreateVectorStoreTool(unittest.TestCase):
         Test that a default client is created if none is provided.
         """
         CreateVectorStoreTool()
-        
+
         mock_openai.assert_called_once()
 
     @patch("openai.OpenAI")
@@ -63,7 +63,8 @@ class TestCreateVectorStoreTool(unittest.TestCase):
         from openai import APIError
         mock_client = MagicMock()
         mock_request = MagicMock()
-        mock_client.vector_stores.create.side_effect = APIError(message="API Error", request=mock_request, body=None)
+        mock_client.vector_stores.create.side_effect = \
+            APIError(message="API Error", request=mock_request, body=None)
         mock_openai.return_value = mock_client
 
         tool = CreateVectorStoreTool(client=mock_client)
