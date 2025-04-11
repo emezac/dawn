@@ -1,0 +1,4 @@
+The Team leader first "plans" the task using the "Think" tool, orchestrates member Agents, and then evaluates the results using the "Analyze" tool. From my limited experience, this approach is changing the game. Autonomous Agent Teams can now, consistently solve complex problems with low variance for the first time.
+
+Check out the `Think` -> `Orchestrate` -> `Analyze` pattern in action, this is a fairly hard 
+
