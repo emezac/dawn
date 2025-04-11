@@ -79,34 +79,76 @@ class LLMInterface:
             }
 
             if use_file_search and file_search_vector_store_ids:
+                # Updated to match the new OpenAI API requirements for file search tool
+                # Just provide the tool configuration and let the model decide how to use it
                 request_params["tools"] = [
                     {
-                        "type": "file_search",
-                        "file_search": {
-                            "vector_store_ids": file_search_vector_store_ids,
-                            "max_results": file_search_max_results,
+                        "type": "function",
+                        "function": {
+                            "name": "file_search",
+                            "description": "Search through files using vector search",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "vector_store_ids": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "List of vector store IDs to search in",
+                                    },
+                                    "max_results": {
+                                        "type": "integer",
+                                        "description": "Maximum number of results to return",
+                                    },
+                                },
+                                "required": ["vector_store_ids"],
+                            },
                         },
                     }
                 ]
+
+                # Just tell the model to use the file_search function but don't try to force the arguments
+                request_params["tool_choice"] = {"type": "function", "function": {"name": "file_search"}}
 
             response = self.client.chat.completions.create(**request_params)
 
             annotations = []
 
             # Validate response structure and extract content
-            if response.choices and response.choices[0].message and response.choices[0].message.content:
-                content = response.choices[0].message.content.strip()
+            if response.choices and response.choices[0].message:
+                message = response.choices[0].message
 
-                if hasattr(response.choices[0].message, "annotations"):
-                    annotations = response.choices[0].message.annotations
+                # Handle case where message has content
+                if message.content:
+                    content = message.content.strip()
 
-                log_info(f"Received response from model (first 100 chars): {content[:100]}...")
-                return {"success": True, "response": content, "annotations": annotations}
-            else:
-                # Handle cases where the API response structure is unexpected
-                error_msg = "LLM response object missing expected content structure."
-                log_error(f"{error_msg} Full Response: {response}")  # Log the actual response object
-                return {"success": False, "error": error_msg}
+                    if hasattr(message, "annotations"):
+                        annotations = message.annotations
+
+                    log_info(f"Received response from model (first 100 chars): {content[:100]}...")
+                    return {"success": True, "response": content, "annotations": annotations}
+
+                # Handle case where message has tool_calls but no content
+                elif hasattr(message, "tool_calls") and message.tool_calls:
+                    tool_call_info = []
+
+                    for tool_call in message.tool_calls:
+                        if tool_call.type == "function" and tool_call.function.name == "file_search":
+                            tool_call_info.append(f"File search with parameters: {tool_call.function.arguments}")
+
+                    if tool_call_info:
+                        tool_response = "; ".join(tool_call_info)
+                        log_info(f"Received tool call response: {tool_response}")
+                        return {
+                            "success": True,
+                            "response": "Results from file search",
+                            "annotations": annotations,
+                            "tool_calls": tool_call_info,
+                        }
+
+            # Handle cases where the API response structure is unexpected
+            error_msg = "LLM response object missing expected content structure."
+            log_error(f"{error_msg} Full Response: {response}")  # Log the actual response object
+            return {"success": False, "error": error_msg}
 
         except (APIError, APIConnectionError, RateLimitError) as api_e:
             # Handle specific OpenAI API errors

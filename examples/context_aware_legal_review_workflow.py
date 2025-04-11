@@ -27,7 +27,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the project root directory to Python's module search path
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from core.agent import Agent
 from core.task import Task
@@ -69,16 +70,16 @@ def create_vector_stores_if_needed():
     Returns a tuple of (legal_guidelines_vs_id, agent_ltm_vs_id).
     """
     registry = ToolRegistry()
-    
+
     list_result = registry.execute_tool("list_vector_stores", {})
     if not list_result["success"]:
         print("Failed to list vector stores:", list_result["error"])
         return None, None
-    
+
     existing_stores = list_result["result"]
     legal_vs_id = None
     ltm_vs_id = None
-    
+
     for store in existing_stores:
         if store["name"] == "Internal Legal Guidelines":
             legal_vs_id = store["id"]
@@ -86,17 +87,18 @@ def create_vector_stores_if_needed():
         elif store["name"] == "Agent LTM":
             ltm_vs_id = store["id"]
             print(f"Found existing agent LTM vector store: {ltm_vs_id}")
-    
+
     if not legal_vs_id:
-        create_result = registry.execute_tool("vector_store_create", {"name": "Internal Legal Guidelines"})
+        create_result = registry.execute_tool("create_vector_store", {"name": "Internal Legal Guidelines"})
         if not create_result["success"]:
             print("Failed to create legal guidelines vector store:", create_result["error"])
             return None, None
         legal_vs_id = create_result["result"]
         print(f"Created new legal guidelines vector store: {legal_vs_id}")
-        
+
         with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".txt") as temp_file:
-            temp_file.write("""
+            temp_file.write(
+                """
             INTERNAL LEGAL GUIDELINES
             
             1. COMPENSATION GUIDELINES
@@ -123,57 +125,70 @@ def create_vector_stores_if_needed():
             - Arbitration should be conducted by JAMS, not general "binding arbitration"
             - Venue should be Delaware, not California
             - Governing law should be Delaware law, not California law
-            """)
+            """
+            )
             legal_doc_path = temp_file.name
-        
+
         upload_result = registry.execute_tool(
-            "upload_file_to_vector_store", 
-            {"vector_store_id": legal_vs_id, "file_path": legal_doc_path}
+            "upload_file_to_vector_store",
+            {"vector_store_id": legal_vs_id, "file_path": legal_doc_path, "purpose": "assistants"},
         )
         if not upload_result["success"]:
             print("Failed to upload legal guidelines:", upload_result["error"])
         else:
             print("Uploaded legal guidelines to vector store")
-        
+
         os.remove(legal_doc_path)
-    
+
     if not ltm_vs_id:
-        create_result = registry.execute_tool("vector_store_create", {"name": "Agent LTM"})
+        create_result = registry.execute_tool("create_vector_store", {"name": "Agent LTM"})
         if not create_result["success"]:
             print("Failed to create agent LTM vector store:", create_result["error"])
             return legal_vs_id, None
         ltm_vs_id = create_result["result"]
         print(f"Created new agent LTM vector store: {ltm_vs_id}")
-        
+
+        # Test the save_to_ltm tool directly
+        print("\nTesting save_to_ltm tool directly...")
+        test_save_result = registry.execute_tool(
+            "save_to_ltm", {"vector_store_id": ltm_vs_id, "text_content": "This is a test of the save_to_ltm tool."}
+        )
+        if not test_save_result["success"]:
+            print("Direct test of save_to_ltm failed:", test_save_result["error"])
+            print("Will continue with workflow, but saving to LTM may fail.")
+        else:
+            print("Direct test of save_to_ltm succeeded:", test_save_result["result"])
+
+        # Now proceed with the actual save
         save_result = registry.execute_tool(
-            "save_to_ltm", 
+            "save_to_ltm",
             {
-                "vector_store_id": ltm_vs_id, 
-                "text_content": "Previous contract reviews have shown that clients often negotiate for longer termination periods and higher hourly rates."
-            }
+                "vector_store_id": ltm_vs_id,
+                "text_content": "Previous contract reviews have shown that clients often negotiate for longer termination periods and higher hourly rates.",
+            },
         )
         if not save_result["success"]:
             print("Failed to save initial memory to LTM:", save_result["error"])
         else:
             print("Saved initial memory to LTM")
-    
+
     return legal_vs_id, ltm_vs_id
 
 
 def build_legal_review_workflow(legal_vs_id, ltm_vs_id, draft_contract):
     """
     Build the legal contract review workflow.
-    
+
     Args:
         legal_vs_id: Vector store ID for legal guidelines
         ltm_vs_id: Vector store ID for agent LTM
         draft_contract: The draft contract text to review
-        
+
     Returns:
         A Workflow object with all tasks configured
     """
     workflow = Workflow(workflow_id="legal_review_workflow", name="Legal Contract Review Workflow")
-    
+
     task1 = Task(
         task_id="task_1_extract_topics",
         name="Extract Contract Topics",
@@ -181,10 +196,10 @@ def build_legal_review_workflow(legal_vs_id, ltm_vs_id, draft_contract):
         input_data={
             "prompt": f"Identify the main legal topics or clause types present in this contract draft:\n\n{draft_contract}\n\nList them concisely."
         },
-        next_task_id_on_success="task_2_search_internal_docs"
+        next_task_id_on_success="task_2_search_internal_docs",
     )
     workflow.add_task(task1)
-    
+
     task2 = Task(
         task_id="task_2_search_internal_docs",
         name="Search Internal Legal Guidelines",
@@ -195,23 +210,25 @@ def build_legal_review_workflow(legal_vs_id, ltm_vs_id, draft_contract):
         next_task_id_on_success="task_4_synthesize_and_redline",
         use_file_search=True,
         file_search_vector_store_ids=[legal_vs_id],
-        parallel=True
+        parallel=True,
     )
+    # Print debugging information about the legal guidelines vector store ID
+    print(f"\nDebug - Legal Guidelines Vector Store ID: '{legal_vs_id}', Type: {type(legal_vs_id)}")
     workflow.add_task(task2)
-    
+
     task3 = Task(
         task_id="task_3_search_web_updates",
         name="Search Web for Recent Legal Updates",
         tool_name="web_search",
         input_data={
             "query": "Recent legal updates or notable court rulings in California concerning contract clauses related to: ${task_1_extract_topics.output_data}",
-            "context_size": "medium"
+            "context_size": "medium",
         },
         next_task_id_on_success="task_4_synthesize_and_redline",
-        parallel=True
+        parallel=True,
     )
     workflow.add_task(task3)
-    
+
     task4 = Task(
         task_id="task_4_synthesize_and_redline",
         name="Synthesize Findings and Generate Redlines",
@@ -227,6 +244,8 @@ def build_legal_review_workflow(legal_vs_id, ltm_vs_id, draft_contract):
             2. Recent Web Updates Summary: ${{task_3_search_web_updates.output_data}}
             3. (Implicit Context) Relevant past interactions or preferences from long-term memory.
             
+            Note: If any of the above information is missing, please continue with the available information.
+            
             Your task is to act as an in-house legal reviewer. Identify specific clauses in the draft contract that deviate from our internal guidelines or are potentially impacted by recent web updates.
             Generate specific, actionable redline suggestions for these clauses. For each suggestion, briefly cite the reason (e.g., "Internal Guideline Section 3.2", "Recent Update on [Topic]").
             If a clause is compliant or standard, note that.
@@ -237,23 +256,26 @@ def build_legal_review_workflow(legal_vs_id, ltm_vs_id, draft_contract):
         next_task_id_on_success="task_5_save_to_ltm",
         use_file_search=True,
         file_search_vector_store_ids=[ltm_vs_id],
-        parallel=False
+        parallel=False,
     )
     workflow.add_task(task4)
-    
+
     task5 = Task(
         task_id="task_5_save_to_ltm",
         name="Save Review Summary to LTM",
         tool_name="save_to_ltm",
         input_data={
-            "vector_store_id": ltm_vs_id,
-            "text_content": f"Contract review performed on {datetime.now().strftime('%Y-%m-%d')} for draft: '{draft_contract[:100]}...'. Key findings/Redlines: ${{task_4_synthesize_and_redline.output_data[:500]}}..."
+            "vector_store_id": ltm_vs_id if ltm_vs_id else "vs_default",
+            "text_content": f"Contract review performed on {datetime.now().strftime('%Y-%m-%d')} for draft: '{draft_contract[:100]}...'. Key findings/Redlines: ${{task_4_synthesize_and_redline.output_data[:500]}}...",
         },
         next_task_id_on_success="task_6_format_output",
-        parallel=False
+        next_task_id_on_failure="task_6_format_output",
+        max_retries=1,
     )
+    # Print debugging information about the vector store ID
+    print(f"\nDebug - LTM Vector Store ID: '{ltm_vs_id}', Type: {type(ltm_vs_id)}")
     workflow.add_task(task5)
-    
+
     task6 = Task(
         task_id="task_6_format_output",
         name="Format Final Review Report",
@@ -272,19 +294,19 @@ ${{task_4_synthesize_and_redline.output_data}}
 *LTM Context Used: Yes*
 
 {datetime.now().strftime('%Y-%m-%d')}
-"""
+""",
         },
-        parallel=False
+        parallel=False,
     )
     workflow.add_task(task6)
-    
+
     return workflow
 
 
 def main():
     """Main function to run the context-aware legal review workflow."""
     print("Starting Context-Aware Legal Contract Review Workflow Example")
-    
+
     if not os.environ.get("OPENAI_API_KEY"):
         print("WARNING: OPENAI_API_KEY environment variable is not set.")
         print("This example requires an OpenAI API key to run.")
@@ -292,49 +314,71 @@ def main():
         print("Example: export OPENAI_API_KEY=your_api_key_here")
         print("\nExiting without running the workflow.")
         return
-    
+
     legal_vs_id, ltm_vs_id = create_vector_stores_if_needed()
     if not legal_vs_id or not ltm_vs_id:
         print("Failed to set up required vector stores. Exiting.")
         return
-    
+
     workflow = build_legal_review_workflow(legal_vs_id, ltm_vs_id, SAMPLE_CONTRACT)
-    
-    agent = Agent(
-        agent_id="legal_review_agent",
-        name="Legal Contract Review Agent"
-    )
+
+    agent = Agent(agent_id="legal_review_agent", name="Legal Contract Review Agent")
     agent.load_workflow(workflow)
-    
-    
+
     print("\nExecuting legal contract review workflow...")
     result = agent.run()
-    
-    if result:
-        print("\nWorkflow completed successfully!")
-        
-        output_task = None
-        for task in workflow.tasks:
-            if task.task_id == "task_6_format_output":
-                output_task = task
-                break
-        
-        if output_task and output_task.output_data:
-            output_path = output_task.output_data
-            
-            print(f"\nReview report saved to: {output_path}")
-            
-            try:
-                with open(output_path, "r", encoding="utf-8") as f:
-                    md_content = f.read()
-                print("\nFinal Review Report Content:\n")
-                print(md_content)
-            except Exception as e:
-                print(f"Error reading review report: {str(e)}")
+
+    # Show a summary of task statuses
+    print("\nWorkflow Task Summary:")
+    completed_tasks = 0
+    failed_tasks = 0
+
+    for task_id in workflow.tasks:
+        task = workflow.get_task(task_id)
+        if task:
+            status = task.status
+            print(f"  - {task.name} (ID: {task.id}): {status}")
+            if status == "completed":
+                completed_tasks += 1
+            elif status == "failed":
+                failed_tasks += 1
         else:
-            print("\nCould not find output path in task data.")
+            print(f"  - Task ID {task_id}: Not found in workflow")
+
+    print(f"\nCompleted Tasks: {completed_tasks}, Failed Tasks: {failed_tasks}")
+
+    if completed_tasks > 0:
+        print("\nOutput from completed tasks:")
+        for task_id in workflow.tasks:
+            task = workflow.get_task(task_id)
+            if task and task.status == "completed" and task.output_data:
+                output = task.output_data.get("response", "No output")
+                if len(output) > 200:
+                    output = output[:200] + "..."
+                print(f"  - {task.name}: {output}")
+
+    # Check for specific output task
+    output_task = workflow.get_task("task_6_format_output")
+    if output_task and output_task.output_data and "response" in output_task.output_data:
+        output_path = output_task.output_data["response"]
+
+        print(f"\nReview report saved to: {output_path}")
+
+        try:
+            with open(output_path, "r", encoding="utf-8") as f:
+                md_content = f.read()
+            print("\nFinal Review Report Content:\n")
+            print(md_content)
+        except Exception as e:
+            print(f"Error reading review report: {str(e)}")
     else:
-        print("\nWorkflow failed to complete.")
+        print("\nFinal output task did not complete successfully.")
+
+    if result:
+        print("\nWorkflow completed successfully overall.")
+    else:
+        print("\nWorkflow encountered errors during execution.")
+        print("Check the task summary above for details on which tasks failed.")
 
 
 if __name__ == "__main__":

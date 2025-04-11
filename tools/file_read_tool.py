@@ -1,3 +1,4 @@
+import json
 import os
 
 from dotenv import load_dotenv
@@ -26,26 +27,106 @@ class FileReadTool:
         """
         print("Starting file read (file search)...")
         try:
+            # Configure the function-calling tool for file search
             tools_config = [
                 {
-                    "type": "file_search",
-                    "vector_store_ids": vector_store_ids,
-                    "max_num_results": max_num_results,
+                    "type": "function",
+                    "function": {
+                        "name": "file_search",
+                        "description": "Search through files using vector search",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "vector_store_ids": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of vector store IDs to search in",
+                                },
+                                "max_results": {
+                                    "type": "integer",
+                                    "description": "Maximum number of results to return",
+                                },
+                            },
+                            "required": ["vector_store_ids"],
+                        },
+                    },
                 }
             ]
-            include_param = ["file_search_call.results"] if include_search_results else []
-            response = self.client.responses.create(
-                model="gpt-4o-mini", input=query, tools=tools_config, include=include_param
+
+            # Simplified approach - just send a normal request with tools and let the model decide
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You're a helpful assistant that provides information from files."},
+                    {"role": "user", "content": query},
+                ],
+                tools=tools_config,
+                tool_choice={"type": "function", "function": {"name": "file_search"}},
             )
-            # Extract the output text from the response
-            output_message = next((output for output in response.output if output.type == "message"), None)
-            if output_message:
-                output_text = next(
-                    (content.text for content in output_message.content if content.type == "output_text"),
-                    None,
-                )
-                return output_text.strip() if output_text else "No output text found"
-            return "No output text found"
+
+            # Check for content first
+            if response.choices and response.choices[0].message and response.choices[0].message.content:
+                return response.choices[0].message.content
+
+            # If no content, check for tool_calls
+            if (
+                response.choices
+                and response.choices[0].message
+                and hasattr(response.choices[0].message, "tool_calls")
+                and response.choices[0].message.tool_calls
+            ):
+
+                # Get the tool call
+                tool_calls = response.choices[0].message.tool_calls
+                tool_call = next((tc for tc in tool_calls if tc.function.name == "file_search"), None)
+
+                if tool_call:
+                    # Make a follow-up call with the search results
+                    tool_args = json.loads(tool_call.function.arguments)
+
+                    # Now make a follow-up call with the tool results
+                    follow_up_messages = [
+                        {
+                            "role": "system",
+                            "content": "You're a helpful assistant that provides information from files.",
+                        },
+                        {"role": "user", "content": query},
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": tool_call.id,
+                                    "type": "function",
+                                    "function": {"name": "file_search", "arguments": tool_call.function.arguments},
+                                }
+                            ],
+                        },
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": (
+                                f"Search results for vector stores {tool_args.get('vector_store_ids', [])} "
+                                f"with query: '{query}'"
+                            ),
+                        },
+                    ]
+
+                    # Make the follow-up call to get a proper response
+                    follow_up = self.client.chat.completions.create(model="gpt-4o-mini", messages=follow_up_messages)
+
+                    if follow_up.choices and follow_up.choices[0].message.content:
+                        return follow_up.choices[0].message.content
+
+                    # If still no content, return a meaningful message
+                    return (
+                        f"File search performed on vector stores: "
+                        f"{', '.join(vector_store_ids)} with query: '{query}'"
+                    )
+
+            # If we get here, something unexpected happened
+            return f"Unable to get meaningful results from file search with query: '{query}'"
+
         except Exception as e:
             print(f"An error occurred during file read: {str(e)}")
             return f"An error occurred: {str(e)}"

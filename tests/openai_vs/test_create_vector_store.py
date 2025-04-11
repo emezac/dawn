@@ -1,6 +1,7 @@
 """
 Tests for the CreateVectorStoreTool.
 """
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -30,7 +31,7 @@ class TestCreateVectorStoreTool(unittest.TestCase):
         result = self.tool.create_vector_store("Test Vector Store")
 
         self.assertEqual(result, "vs_abc123")
-        self.mock_client.vector_stores.create.assert_called_once_with(name="Test Vector Store")
+        self.mock_client.vector_stores.create.assert_called_once_with(name="Test Vector Store", file_ids=[])
 
     def test_create_vector_store_empty_name(self):
         """
@@ -61,10 +62,10 @@ class TestCreateVectorStoreTool(unittest.TestCase):
         Test that API errors are properly propagated.
         """
         from openai import APIError
+
         mock_client = MagicMock()
         mock_request = MagicMock()
-        mock_client.vector_stores.create.side_effect = \
-            APIError(message="API Error", request=mock_request, body=None)
+        mock_client.vector_stores.create.side_effect = APIError(message="API Error", request=mock_request, body=None)
         mock_openai.return_value = mock_client
 
         tool = CreateVectorStoreTool(client=mock_client)

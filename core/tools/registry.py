@@ -5,7 +5,6 @@ from openai import APIConnectionError, APIError, BadRequestError, RateLimitError
 from tools.file_read_tool import FileReadTool
 from tools.file_upload_tool import FileUploadTool
 from tools.openai_vs.create_vector_store import CreateVectorStoreTool
-from tools.vector_store_tool import VectorStoreTool
 from tools.web_search_tool import WebSearchTool
 from tools.write_markdown_tool import WriteMarkdownTool
 
@@ -31,13 +30,14 @@ class ToolRegistry:
         self.register_tool("web_search", self.web_search_tool_handler)
         self.register_tool("file_read", self.file_read_tool_handler)
         self.register_tool("file_upload", self.file_upload_tool_handler)
-        self.register_tool("vector_store_create", self.vector_store_create_tool_handler)
+        self.register_tool("create_vector_store", self.create_vector_store_handler)
         self.register_tool("upload_file_to_vector_store", self.upload_file_to_vector_store_tool_handler)
         self.register_tool("save_to_ltm", self.save_to_ltm_tool_handler)
         self.register_tool("list_vector_stores", self.list_vector_stores_tool_handler)
         self.register_tool("delete_vector_store", self.delete_vector_store_tool_handler)
-        self.register_tool("create_vector_store", self.create_vector_store_handler)
         self.register_tool("write_markdown", self.write_markdown_tool_handler)
+        # Register vector_store_create as an alias to maintain backward compatibility
+        self.register_tool("vector_store_create", self.create_vector_store_handler)
 
     def register_tool(self, name: str, func: Callable) -> None:
         """
@@ -195,18 +195,23 @@ class ToolRegistry:
         return file_id
 
     def vector_store_create_tool_handler(self, **data) -> Any:
-        """Handler for the Vector Store Create tool."""
-        vector_store_tool = VectorStoreTool()
-        name = data.get("name", "Default Vector Store")
+        """
+        @deprecated: Use create_vector_store_handler instead.
+        This method is maintained for backward compatibility only.
+        """
+        # Import here to avoid circular import
+        from tools.vector_store_tool import VectorStoreTool
+
+        # Use VectorStoreTool for backward compatibility
+        tool = VectorStoreTool()
+
+        name = data.get("name", "")
         file_ids = data.get("file_ids", [])
-        if not file_ids or not isinstance(file_ids, list):
-            raise ValueError("Missing or invalid 'file_ids' list for vector store creation.")
-        # Let create_vector_store raise exceptions directly to execute_tool
-        vs_id = vector_store_tool.create_vector_store(name, file_ids)
-        # Optional: Basic validation on the returned ID format
-        if not vs_id or not isinstance(vs_id, str) or not vs_id.startswith("vs_"):
-            raise ToolExecutionError(f"Invalid vector store ID format received: {vs_id}")
-        return vs_id
+
+        if not name:
+            raise ValueError("Missing 'name' parameter for vector store creation.")
+
+        return tool.create_vector_store(name, file_ids)
 
     def write_markdown_tool_handler(self, **data) -> Any:
         """Handler for the Write Markdown File tool."""
@@ -227,13 +232,19 @@ class ToolRegistry:
         upload_tool = UploadFileToVectorStoreTool()
         vector_store_id = data.get("vector_store_id", "")
         file_path = data.get("file_path", "")
+        purpose = data.get("purpose", "assistants")  # Default to 'assistants' if not specified
 
         if not vector_store_id:
             raise ValueError("Missing 'vector_store_id' for file upload to vector store.")
         if not file_path:
             raise ValueError("Missing 'file_path' for file upload to vector store.")
 
-        return upload_tool.upload_and_add_file_to_vector_store(vector_store_id, file_path)
+        # Validate purpose parameter
+        valid_purposes = ["assistants", "fine-tune", "batch", "user_data", "vision", "evals"]
+        if purpose not in valid_purposes:
+            raise ValueError(f"Invalid purpose: '{purpose}'. Must be one of: {', '.join(valid_purposes)}")
+
+        return upload_tool.upload_and_add_file_to_vector_store(vector_store_id, file_path, purpose=purpose)
 
     def save_to_ltm_tool_handler(self, **data) -> Any:
         """Handler for the Save to LTM tool."""
@@ -243,12 +254,25 @@ class ToolRegistry:
         vector_store_id = data.get("vector_store_id", "")
         text_content = data.get("text_content", "")
 
+        # Add debugging information
+        print(
+            f"\nDebug - save_to_ltm_tool_handler received vector_store_id: "
+            f"'{vector_store_id}', Type: {type(vector_store_id)}"
+        )
+        print(f"Debug - text_content first 50 chars: '{text_content[:50]}...'")
+
         if not vector_store_id:
             raise ValueError("Missing 'vector_store_id' for saving to LTM.")
         if not text_content:
             raise ValueError("Missing 'text_content' for saving to LTM.")
 
-        return save_tool.save_text_to_vector_store(vector_store_id, text_content)
+        try:
+            result = save_tool.save_text_to_vector_store(vector_store_id, text_content)
+            print(f"Debug - save_text_to_vector_store returned: {result}")
+            return result
+        except Exception as e:
+            print(f"Debug - Exception in save_to_ltm_tool_handler: {str(e)}")
+            raise e
 
     def list_vector_stores_tool_handler(self, **data) -> Any:
         """Handler for the List Vector Stores tool."""
@@ -268,19 +292,28 @@ class ToolRegistry:
             raise ValueError("Missing 'vector_store_id' for vector store deletion.")
 
         return delete_tool.delete_vector_store(vector_store_id)
-        
+
     def create_vector_store_handler(self, **data) -> Any:
         """Handler for the Create Vector Store tool."""
         create_vs_tool = CreateVectorStoreTool()
         name = data.get("name", "")
+        file_ids = data.get("file_ids", [])
+
         if not name:
             raise ValueError("Missing 'name' parameter for vector store creation.")
-        
-        # Let create_vector_store raise exceptions directly to execute_tool
-        vs_id = create_vs_tool.create_vector_store(name)
-        
-        if not vs_id or not isinstance(vs_id, str) or not vs_id.startswith("vs_"):
-            raise ToolExecutionError(f"Invalid vector store ID format received: {vs_id}")
-            
-        return vs_id
 
+        # Call the tool and let it handle file_ids validation
+        result = create_vs_tool.create_vector_store(name, file_ids)
+
+        # Check if we got an error dictionary instead of a vector store ID
+        if isinstance(result, dict) and "error" in result:
+            raise ToolExecutionError(result["error"])
+
+        # Import here to avoid circular imports
+        from tools.openai_vs.utils.vs_id_validator import is_valid_vector_store_id
+
+        # Use the validator to check the result
+        if not is_valid_vector_store_id(result):
+            raise ToolExecutionError(f"Invalid vector store ID format received: {result}")
+
+        return result

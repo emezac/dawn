@@ -17,27 +17,21 @@ class TestSaveTextToVectorStoreTool(unittest.TestCase):
     def setUp(self):
         """Set up for testing."""
         self.registry = ToolRegistry()
-        
+
         self.mock_client = MagicMock()
-        
+
         self.patcher = patch("openai.OpenAI", return_value=self.mock_client)
         self.mock_openai = self.patcher.start()
-        
+
         self.tool = SaveTextToVectorStoreTool(client=self.mock_client)
-        
-        self.test_vector_store_id = "vs_test123"
-        self.test_text_content = "This is test content for long-term memory."
-        self.test_file_id = "file-test123"
-        self.test_batch_id = "batch-test123"
-        
-    def tearDown(self):
-        """Clean up after tests."""
-        self.patcher.stop()
 
         self.test_vector_store_id = "vs_test123"
         self.test_text_content = "This is test content for long-term memory."
         self.test_file_id = "file-test123"
-        self.test_batch_id = "batch-test123"
+
+    def tearDown(self):
+        """Clean up after tests."""
+        self.patcher.stop()
 
     def test_save_text_validation(self):
         """Test input validation for save_text_to_vector_store."""
@@ -48,9 +42,10 @@ class TestSaveTextToVectorStoreTool(unittest.TestCase):
             self.tool.save_text_to_vector_store(self.test_vector_store_id, "")
 
     @patch("tempfile.NamedTemporaryFile")
+    @patch("os.path.getsize", return_value=10)  # Simulate non-empty file
     @patch("os.path.exists", return_value=True)
     @patch("os.remove")
-    def test_save_text_success(self, mock_remove, mock_exists, mock_temp_file):
+    def test_save_text_success(self, mock_remove, mock_exists, mock_getsize, mock_temp_file):
         """Test successful text saving to vector store."""
         mock_file = MagicMock()
         mock_file.name = "/tmp/test_temp_file.txt"
@@ -59,7 +54,7 @@ class TestSaveTextToVectorStoreTool(unittest.TestCase):
         mock_upload_tool = MagicMock()
         self.tool.upload_tool = mock_upload_tool
 
-        mock_upload_result = {"file_id": self.test_file_id, "batch_id": self.test_batch_id, "status": "completed"}
+        mock_upload_result = {"file_id": self.test_file_id, "status": "completed"}
         mock_upload_tool.upload_and_add_file_to_vector_store.return_value = mock_upload_result
 
         result = self.tool.save_text_to_vector_store(self.test_vector_store_id, self.test_text_content)
@@ -69,15 +64,16 @@ class TestSaveTextToVectorStoreTool(unittest.TestCase):
         mock_file.write.assert_called_once_with(self.test_text_content)
 
         mock_upload_tool.upload_and_add_file_to_vector_store.assert_called_once_with(
-            vector_store_id=self.test_vector_store_id, file_path=mock_file.name
+            vector_store_id=self.test_vector_store_id, file_path=mock_file.name, purpose="assistants"
         )
 
         mock_remove.assert_called_once_with(mock_file.name)
 
     @patch("tempfile.NamedTemporaryFile")
+    @patch("os.path.getsize", return_value=10)  # Simulate non-empty file
     @patch("os.path.exists", return_value=True)
     @patch("os.remove")
-    def test_save_text_upload_failure(self, mock_remove, mock_exists, mock_temp_file):
+    def test_save_text_upload_failure(self, mock_remove, mock_exists, mock_getsize, mock_temp_file):
         """Test handling of upload failure when saving text."""
         mock_file = MagicMock()
         mock_file.name = "/tmp/test_temp_file.txt"
@@ -92,14 +88,29 @@ class TestSaveTextToVectorStoreTool(unittest.TestCase):
 
         mock_remove.assert_called_once_with(mock_file.name)
 
+    @patch("tempfile.NamedTemporaryFile")
+    @patch("os.path.getsize", return_value=0)  # Simulate empty file
+    @patch("os.path.exists", return_value=True)
+    @patch("os.remove")
+    def test_save_text_empty_file_error(self, mock_remove, mock_exists, mock_getsize, mock_temp_file):
+        """Test handling of empty file error."""
+        mock_file = MagicMock()
+        mock_file.name = "/tmp/test_temp_file.txt"
+        mock_temp_file.return_value.__enter__.return_value = mock_file
+
+        with self.assertRaises(RuntimeError):
+            self.tool.save_text_to_vector_store(self.test_vector_store_id, self.test_text_content)
+
+        mock_remove.assert_called_once_with(mock_file.name)
+
     @patch("tools.openai_vs.save_text_to_vector_store.SaveTextToVectorStoreTool.save_text_to_vector_store")
     @patch("tools.openai_vs.save_text_to_vector_store.OpenAI")
     def test_tool_registry_integration(self, mock_openai_class, mock_save):
         """Test the tool integration with the registry."""
         mock_client = MagicMock()
         mock_openai_class.return_value = mock_client
-        
-        mock_save.return_value = {"file_id": self.test_file_id, "batch_id": self.test_batch_id, "status": "completed"}
+
+        mock_save.return_value = {"file_id": self.test_file_id, "status": "completed"}
 
         input_data = {"vector_store_id": self.test_vector_store_id, "text_content": self.test_text_content}
 

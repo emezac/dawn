@@ -46,16 +46,31 @@ class SaveTextToVectorStoreTool:
         if not text_content or not isinstance(text_content, str):
             raise ValueError("Text content must be a non-empty string")
 
-        with tempfile.NamedTemporaryFile(mode="w+", suffix=".txt", delete=False) as temp_file:
-            temp_file_path = temp_file.name
-            temp_file.write(text_content)
-
+        temp_file_path = None
         try:
-            result = self.upload_tool.upload_and_add_file_to_vector_store(
-                vector_store_id=vector_store_id, file_path=temp_file_path
-            )
+            # Create a temporary file with the text content
+            with tempfile.NamedTemporaryFile(mode="w+", suffix=".txt", delete=False) as temp_file:
+                temp_file_path = temp_file.name
+                temp_file.write(text_content)
 
+            # Make sure file was created and has content
+            if os.path.getsize(temp_file_path) == 0:
+                raise ValueError("Failed to write content to temporary file - file is empty")
+
+            # Verify file exists and is accessible
+            if not os.path.exists(temp_file_path):
+                raise FileNotFoundError(f"Temporary file not found at {temp_file_path}")
+
+            # Upload the file to the vector store
+            result = self.upload_tool.upload_and_add_file_to_vector_store(
+                vector_store_id=vector_store_id,
+                file_path=temp_file_path,
+                purpose="assistants",  # Use valid purpose for OpenAI API
+            )
             return result
+        except Exception as e:
+            raise RuntimeError(f"Error saving text to vector store: {str(e)}")
         finally:
-            if os.path.exists(temp_file_path):
+            # Clean up the temporary file
+            if temp_file_path and os.path.exists(temp_file_path):
                 os.remove(temp_file_path)

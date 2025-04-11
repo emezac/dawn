@@ -6,6 +6,8 @@ from typing import Dict, Optional
 
 from openai import OpenAI
 
+from tools.openai_vs.utils.vs_id_validator import assert_valid_vector_store_id
+
 
 class DeleteVectorStoreTool:
     """
@@ -30,9 +32,12 @@ class DeleteVectorStoreTool:
 
         Returns:
             Dict: A dictionary indicating the deletion status.
+
+        Raises:
+            ValueError: If vector_store_id is invalid.
         """
-        if not vector_store_id or not isinstance(vector_store_id, str):
-            raise ValueError("Vector Store ID must be a non-empty string")
+        # Validate the vector store ID
+        assert_valid_vector_store_id(vector_store_id)
 
         self.client.vector_stores.delete(vector_store_id=vector_store_id)
         return {"deleted": True, "id": vector_store_id}

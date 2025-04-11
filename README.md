@@ -7,6 +7,7 @@ The AI Agent Framework is designed to enhance the capabilities of AI agents, all
 - **Conditional Workflows**: Enable dynamic task execution based on specific conditions or task outcomes, enhancing flexibility and adaptability.
 - **Web Search Tool**: Updated to use the latest model version with improved performance and reliability.
 - **Visualization of Workflow Execution**: Generate visual representations of workflows to aid in understanding and debugging.
+- **Vector Store ID Validation**: Robust utilities for validating OpenAI Vector Store IDs with different validation levels.
 
 ## Usage
 
@@ -62,11 +63,49 @@ from core.utils.visualizer import visualize_workflow
 visualize_workflow(workflow, filename="workflow_graph", format='pdf', view=True)
 ```
 
+### Vector Store ID Validation
+
+The framework provides utilities for validating OpenAI Vector Store IDs, ensuring consistent validation across all tools and workflows.
+
+#### Usage Example
+
+```python
+from tools.openai_vs.utils.vs_id_validator import (
+    is_valid_vector_store_id, 
+    is_strict_valid_vector_store_id,
+    validate_vector_store_id,
+    assert_valid_vector_store_id
+)
+
+# Simple boolean validation
+if is_valid_vector_store_id(vector_store_id):
+    # Perform operation
+
+# Strict validation with regex pattern
+if is_strict_valid_vector_store_id(vector_store_id):
+    # Perform operation requiring strict format
+
+# Get validation status and error message
+is_valid, error_message = validate_vector_store_id(vector_store_id, strict=True)
+if not is_valid:
+    print(f"Invalid vector store ID: {error_message}")
+
+# Assert valid ID (raises ValueError if invalid)
+try:
+    assert_valid_vector_store_id(vector_store_id, strict=False)
+    # Continue with operation
+except ValueError as e:
+    print(f"Validation error: {e}")
+```
+
+For more details on vector store ID validation, see the [Vector Store ID Validation documentation](docs/vector_store_id_validation.md).
+
 ## Examples
 
 - **Complex Conditional Workflow**: `examples/complex_conditional_workflow.py`
 - **Simple Conditional Workflow**: `examples/simple_conditional_workflow.py`
 - **Complex Workflow**: `examples/complex_workflow.py`
+- **Vector Store Example**: `examples/vector_store_example.py`
 
 ## Overview
 
@@ -94,8 +133,23 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
   - Configured in the `tools` array of an API request.
   - Supports user location and search context size customization.
 
+- **Vector Store Tools:**
+  - Create and manage OpenAI Vector Stores for efficient data storage and retrieval.
+  - Utilities for validating vector store IDs with basic and strict validation options.
+  - Integration with file uploads and text storage for comprehensive knowledge management.
+
 - **Observability:**
   - Logging and tracing to support debugging and workflow analysis.
+
+## Dependencies
+
+The framework has the following core dependencies:
+
+- **OpenAI API**: For LLM access and vector store operations
+- **HTTPX**: For direct API calls when the OpenAI client doesn't support certain operations
+- **Pydantic**: For data validation and settings management
+- **Graphviz** (optional): For workflow visualization
+- **python-dotenv**: For environment variable management
 
 ## Installation
 
@@ -237,3 +291,16 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Contact
 
 For questions or feedback, please contact Enrique Meza C: emezac at [gmail.com]
+
+## Documentation
+
+The project includes comprehensive documentation:
+
+- **Usage Guides**: Examples and tutorials on how to use the framework effectively.
+- **API Reference**: Documentation of all public classes, methods, and interfaces.
+- **Tool Documentation**: Detailed information on available tools and their usage.
+- **Validation Utilities**: Guidelines for validating inputs and outputs, including [Vector Store ID Validation](docs/vector_store_id_validation.md).
+- **OpenAI Integration**: Information on working with OpenAI APIs, including:
+  - [File Purpose Parameters](docs/openai_file_purpose_parameters.md)
+  - [API Parameter Changes](docs/openai_api_parameter_changes.md) (including Beta API header format)
+- **Fixes and Enhancements**: Documentation of known issues and their solutions in the `fixes` directory.
