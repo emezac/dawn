@@ -1,5 +1,26 @@
 [flake8]
 max-line-length = 120
-exclude = .git,__pycache__,build,dist
-# Ignore D202: "No blank lines allowed after function docstring"
-ignore = D202 
+exclude = .git,__pycache__,build,dist,setup.py,.venv,venv
+
+# Ignoring formatting rules that conflict with common code formatters
+ignore = 
+    # No blank lines allowed after function docstring
+    D202,
+    # Line break occurred before a binary operator
+    W503,
+    # Line break occurred after a binary operator
+    W504,
+    # Module level import not at top of file
+    E402,
+    # Too many leading '#' for block comment
+    E266
+
+# Specify which errors should never be ignored
+select = E,F,W,C,D
+
+# Ignore specific issues in specific files (if needed)
+# per-file-ignores =
+#    tests/*_test.py: D100,D101
+
+# Docstring style settings
+docstring-convention = google 

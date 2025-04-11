@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from core.agent import Agent
 from core.engine import WorkflowEngine
-from core.task import Task
+from core.task import DirectHandlerTask, Task
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
 
@@ -243,29 +243,6 @@ def create_compliance_vector_store_if_needed(registry: ToolRegistry) -> Optional
     return compliance_vs_id
 
 
-# --- Patch Implementation ---
-def patch_workflow_engine():
-    """Apply patches to the workflow engine to support direct handler tasks."""
-    # Store the original execute_task method
-    original_execute_task = WorkflowEngine.execute_task
-
-    # Define our patched method
-    def patched_execute_task(self, task):
-        # Check if this is a DirectHandlerTask
-        if isinstance(task, DirectHandlerTask):
-            logger.info(f"Using direct handler execution for task {task.id}")
-            # Call the DirectHandlerTask's execute method directly
-            result = task.execute(agent=None)  # We don't have the agent here, but that's okay for simple tasks
-            return result
-        else:
-            # Call the original method for non-DirectHandlerTask tasks
-            return original_execute_task(self, task)
-
-    # Apply the patch
-    WorkflowEngine.execute_task = patched_execute_task
-    logger.info("Applied workflow engine patch for DirectHandlerTask support")
-
-
 def build_compliance_check_workflow(
     compliance_vs_id: str, ltm_vs_id: Optional[str], initial_input: Dict[str, Any]
 ) -> Workflow:
@@ -286,9 +263,6 @@ def build_compliance_check_workflow(
     # Register tools again here to ensure they're available
     registry.register_tool("log_alert", log_alert_handler)
     registry.register_tool("log_info", log_info_handler)
-
-    # Apply our patch to the workflow engine
-    patch_workflow_engine()
 
     workflow = Workflow(workflow_id="compliance_check_llm_workflow_v2", name="Compliance Check Workflow (LLM/VS)")
 
@@ -415,69 +389,6 @@ def build_compliance_check_workflow(
     return workflow
 
 
-# Instead of using a completely custom DirectHandlerTask, let's create a subclass of Task
-class DirectHandlerTask(Task):
-    """
-    A Task subclass that directly executes a handler function instead of using the tool registry.
-    """
-
-    def __init__(
-        self,
-        task_id,
-        name,
-        handler,
-        input_data=None,
-        condition=None,
-        next_task_id_on_success=None,
-        next_task_id_on_failure=None,
-        max_retries=0,
-    ):
-        # Call the parent constructor with standard parameters
-        # Use a dummy tool name to satisfy the validation
-        super().__init__(
-            task_id=task_id,
-            name=name,
-            tool_name="_direct_handler_",  # Use a special prefix that won't conflict with real tools
-            is_llm_task=False,
-            input_data=input_data,
-            condition=condition,
-            next_task_id_on_success=next_task_id_on_success,
-            next_task_id_on_failure=next_task_id_on_failure,
-            max_retries=max_retries,
-        )
-        # Store the handler function
-        self.handler = handler
-        # Flag to indicate this is a direct handler task
-        self._is_direct_handler = True
-
-    def execute(self, agent=None):
-        """Override the execute method to directly call the handler function."""
-        logger.info(f"Executing direct handler task: {self.name} (ID: {self.id})")
-
-        try:
-            # Execute handler directly instead of using the registry
-            logger.info(f"Calling direct handler for task {self.id}")
-            result = self.handler(self.input_data)
-            logger.info(f"Direct handler execution result: {result}")
-
-            # Set output directly
-            self.output_data = result
-
-            # Check success
-            if result.get("success", False) or result.get("status") == "success":
-                self.status = "completed"
-                return True
-            else:
-                self.status = "failed"
-                return False
-
-        except Exception as e:
-            logger.error(f"Error executing direct handler: {e}")
-            self.status = "failed"
-            self.output_data = {"success": False, "status": "error", "error": str(e)}
-            return False
-
-
 def create_task(
     task_id,
     name,
@@ -522,6 +433,7 @@ def create_task(
             next_task_id_on_success=next_task_id_on_success,
             next_task_id_on_failure=next_task_id_on_failure,
             max_retries=max_retries,
+            parallel=parallel,
         )
     else:
         # Create a standard task

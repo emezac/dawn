@@ -1,0 +1,7 @@
+- id: flake8
+  name: flake8
+  description: "Checks for style and quality issues"
+  entry: flake8
+  language: python
+  types: [python]
+  args: ["--ignore=D202"] 

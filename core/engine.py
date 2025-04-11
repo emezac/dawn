@@ -66,9 +66,62 @@ class WorkflowEngine:
                             log_error(f"Referenced task {ref_task_id} not found in workflow")
         return processed_input
 
-    def execute_llm_task(self, task: Task) -> Dict[str, Any]:
+    def execute_task(self, task: Task) -> bool:
+        """
+        Execute a task and return whether it was successful.
+
+        This method handles different types of tasks including LLM tasks, tool tasks,
+        and DirectHandlerTasks.
+
+        Args:
+            task: The task to execute
+
+        Returns:
+            bool: True if execution was successful, False otherwise
+        """
+        log_task_start(task.id, task.name, self.workflow.id)
+        task.set_status("running")
+
+        # Process task input to resolve variable references
         processed_input = self.process_task_input(task)
         log_task_input(task.id, processed_input)
+
+        # Check if this is a DirectHandlerTask
+        if hasattr(task, "is_direct_handler") and task.is_direct_handler:
+            # Execute DirectHandlerTask directly using its execute method
+            result = task.execute(processed_input)
+        # Standard task execution based on type
+        elif task.is_llm_task:
+            result = self.execute_llm_task(task, processed_input)
+        else:
+            result = self.execute_tool_task(task, processed_input)
+
+        # Process the result
+        if result.get("success", False):
+            task.set_status("completed")
+            output_key = "response" if "response" in result else "result"
+            task.set_output({"response": result.get(output_key, {})})
+            log_task_end(task.id, task.name, "completed", self.workflow.id)
+            return True
+        else:
+            return self.handle_task_failure(task, result)
+
+    def execute_llm_task(self, task: Task, processed_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Execute an LLM task using the LLM interface.
+
+        Args:
+            task: The LLM task to execute
+            processed_input: Optional pre-processed input data
+
+        Returns:
+            Dict with the result of LLM execution
+        """
+        # Use provided processed input or process it now
+        if processed_input is None:
+            processed_input = self.process_task_input(task)
+            log_task_input(task.id, processed_input)
+
         prompt = processed_input.get("prompt", "")
         if not prompt:
             return {"success": False, "error": "No prompt provided for LLM task"}
@@ -87,9 +140,22 @@ class WorkflowEngine:
             log_error(f"LLM task {task.id} failed: {result.get('error', 'Unknown error')}")
             return result
 
-    def execute_tool_task(self, task: Task) -> Dict[str, Any]:
-        processed_input = self.process_task_input(task)
-        log_task_input(task.id, processed_input)
+    def execute_tool_task(self, task: Task, processed_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Execute a tool task using the tool registry.
+
+        Args:
+            task: The tool task to execute
+            processed_input: Optional pre-processed input data
+
+        Returns:
+            Dict with the result of tool execution
+        """
+        # Use provided processed input or process it now
+        if processed_input is None:
+            processed_input = self.process_task_input(task)
+            log_task_input(task.id, processed_input)
+
         result = self.tool_registry.execute_tool(task.tool_name, processed_input)
         if result["success"]:
             log_task_output(task.id, result)
@@ -97,21 +163,6 @@ class WorkflowEngine:
         else:
             log_error(f"Tool task {task.id} failed: {result.get('error', 'Unknown error')}")
             return result
-
-    def execute_task(self, task: Task) -> bool:
-        log_task_start(task.id, task.name, self.workflow.id)
-        task.set_status("running")
-        if task.is_llm_task:
-            result = self.execute_llm_task(task)
-        else:
-            result = self.execute_tool_task(task)
-        if result.get("success", False):
-            task.set_status("completed")
-            task.set_output({"response": result.get("response", result.get("result", {}))})
-            log_task_end(task.id, task.name, "completed", self.workflow.id)
-            return True
-        else:
-            return self.handle_task_failure(task, result)
 
     def handle_task_failure(self, task: Task, result: Dict[str, Any]) -> bool:
         if task.can_retry():
