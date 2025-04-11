@@ -33,6 +33,11 @@ from core.tools.registry_access import (
 from core.services import get_services
 from core.llm.interface import LLMInterface  # Add import for LLMInterface
 
+# Import exit code management utilities
+from core.utils.exit_code_manager import (
+    ExitCode, exit_with_error, wrap_main_function
+)
+
 # Configure logging
 logger = logging.getLogger("compliance_workflow")
 handler = logging.StreamHandler()
@@ -858,8 +863,12 @@ def create_task(
     return task
 
 
-def main() -> None:
-    """Run the compliance check workflow example."""
+def main() -> Dict[str, Any]:
+    """Run the compliance check workflow example.
+    
+    Returns:
+        Dictionary with status information about the workflow execution.
+    """
     logger.info("Starting Compliance Check Workflow Example (using LLM + FileSearch)")
 
     # Initialize services container
@@ -867,8 +876,12 @@ def main() -> None:
     
     # Basic check for prerequisites
     if not os.getenv("OPENAI_API_KEY"):
-        logger.error("OPENAI_API_KEY environment variable is required for LLM tasks.")
-        sys.exit(1)  # Exit with error code
+        # Use exit_with_error instead of direct sys.exit
+        return {
+            "success": False,
+            "error": "OPENAI_API_KEY environment variable is required for LLM tasks.",
+            "error_type": "config"
+        }
 
     # --- Initialize Tool Registry and Register Placeholder Tools ---
     try:
@@ -897,19 +910,31 @@ def main() -> None:
         missing_tools = [tool for tool in required_vs_tools if not tool_exists(tool)]
 
         if missing_tools:
-            logger.error(f"Missing required Vector Store tools in registry: {missing_tools}")
-            sys.exit(1)
+            # Return error information instead of direct sys.exit
+            return {
+                "success": False,
+                "error": f"Missing required Vector Store tools in registry: {missing_tools}",
+                "error_type": "resource"
+            }
 
     except Exception as e:
         logger.error(f"Error initializing/registering tools: {e}")
         traceback.print_exc()  # Print full traceback for better debugging
-        sys.exit(1)  # Exit with error code
+        return {
+            "success": False,
+            "error": f"Error initializing/registering tools: {str(e)}",
+            "error_type": "general"
+        }
 
     # --- Setup Compliance Vector Store ---
     compliance_vs_id = create_compliance_vector_store_if_needed()
     if not compliance_vs_id:
-        logger.error("Failed to ensure compliance vector store is ready. Exiting.")
-        sys.exit(1)  # Exit with error code
+        # Return error information instead of direct sys.exit
+        return {
+            "success": False,
+            "error": "Failed to ensure compliance vector store is ready.",
+            "error_type": "resource"
+        }
     logger.info(f"Using compliance vector store ID: {compliance_vs_id}")
 
     # --- Setup LTM Vector Store (Optional) ---
@@ -1065,16 +1090,29 @@ def main() -> None:
         logger.info("\n--- End Workflow Execution ---")
         if result_status and failed_tasks == 0:
             logger.info("\nWorkflow marked as successful overall.")
-            sys.exit(0)  # Explicit successful exit
+            return {
+                "success": True,
+                "result": result_status
+            }
         else:
             logger.warning("\nWorkflow marked as failed or incomplete overall.")
-            sys.exit(1)  # Exit with error code
+            return {
+                "success": False,
+                "error": "Workflow execution encountered errors or incomplete tasks",
+                "error_type": "execution",
+                "result": result_status
+            }
             
     except Exception as e:
         logger.error(f"Unexpected error during workflow execution: {e}")
         traceback.print_exc()
-        sys.exit(1)  # Exit with error code
+        return {
+            "success": False,
+            "error": f"Unexpected error during workflow execution: {str(e)}",
+            "error_type": "general"
+        }
 
 
 if __name__ == "__main__":
-    main()
+    # Use the wrapper function to handle exit codes consistently
+    wrap_main_function(main)()

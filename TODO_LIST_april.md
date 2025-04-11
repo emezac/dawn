@@ -48,15 +48,15 @@
 
 ### 3. Error Handling and Reporting
 
-- [x] **Standardize error reporting**
+- [ ] **Standardize error reporting**
   - Create consistent error response format for all tools
   - Implement error codes and standardized error messages
   - [x] Add proper error propagation between tasks
 
 - [ ] **Improve exit code handling**
-  - Standardize exit code usage across all framework code
-  - Add wrapper for main functions to ensure consistent exit code behavior
-  - Create exit code documentation for framework users
+  - [x] Standardize exit code usage across all framework code
+  - [x] Add wrapper for main functions to ensure consistent exit code behavior
+  - [x] Create exit code documentation for framework users
 
 ### 4. Testing Infrastructure
 
@@ -127,6 +127,9 @@
 1. Implement proper DirectHandlerTask as core feature ✅
 2. Fix variable interpolation in task inputs ✅ 
 3. Add proper error propagation between tasks ✅
+4. Standardize exit code usage across framework code ✅
+5. Add wrapper for main functions to ensure consistent exit code behavior ✅
+6. Create exit code documentation for framework users ✅
 
 ## DirectHandlerTask Implementation Proposal
 
@@ -639,6 +642,64 @@ def my_tool_handler(input_data):
             ErrorCode.SERVICE_ERROR
         )
 ```
+
+## Exit Code Standardization Implementation
+
+We've implemented a standardized approach to exit codes across the framework:
+
+### 1. Exit Code Conventions
+
+The following exit code conventions have been established:
+
+```
+0: Success - Workflow completed without critical errors
+1: General error - Workflow failed due to a general error condition
+2: Configuration error - Required configuration is missing or invalid
+3: Resource error - Required resources are unavailable or inaccessible
+4: Execution error - Error during execution of specific workflow tasks
+5: Input error - Invalid input data provided to the workflow
+```
+
+### 2. Implementation Details
+
+The standardized exit codes have been implemented in these key areas:
+
+- All workflow scripts use `sys.exit(0)` for successful execution
+- Error conditions are properly differentiated with specific exit codes
+- Framework initialization failures (missing API keys, etc.) use code 2
+- Resource failures (vector store creation, etc.) use code 3
+- Task execution failures use code 4
+- Input validation failures use code 5
+
+### 3. Examples
+
+From smart_compliance_workflow.py:
+```python
+# Configuration error
+if not os.getenv("OPENAI_API_KEY"):
+    logger.error("OPENAI_API_KEY environment variable is required for LLM tasks.")
+    sys.exit(2)  # Exit with configuration error code
+
+# Resource error
+if missing_tools:
+    logger.error(f"Missing required Vector Store tools in registry: {missing_tools}")
+    sys.exit(3)  # Exit with resource error code
+    
+# Resource error
+if not compliance_vs_id:
+    logger.error("Failed to ensure compliance vector store is ready. Exiting.")
+    sys.exit(3)  # Exit with resource error code
+
+# Success case
+if result_status and failed_tasks == 0:
+    logger.info("\nWorkflow marked as successful overall.")
+    sys.exit(0)  # Explicit successful exit
+else:
+    logger.warning("\nWorkflow marked as failed or incomplete overall.")
+    sys.exit(4)  # Exit with execution error code
+```
+
+This standardization ensures consistent behavior across the framework and makes automated error handling more reliable.
 
 ## Implementation Timeline and Release Plan
 
