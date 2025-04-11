@@ -8,16 +8,24 @@ that can be executed in a specific order with dependencies.
 from typing import Any, Dict, List, Optional
 
 from .task import Task
+from .errors import ErrorCode
 
 
 class Workflow:
     """
     Represents a workflow consisting of multiple tasks.
-    """
+    
+    A workflow manages a collection of tasks and tracks their execution status,
+    handling task dependencies and error propagation between tasks.
+    """  # noqa: D202
 
     def __init__(self, workflow_id: str, name: str):
         """
         Initialize a new Workflow.
+        
+        Args:
+            workflow_id: Unique identifier for the workflow
+            name: Human-readable name for the workflow
         """
         self.id = workflow_id
         self.name = name
@@ -25,6 +33,12 @@ class Workflow:
         self.tasks = {}  # Map of task_id to Task objects
         self.task_order = []  # Ordered list of task_ids
         self.current_task_index = 0
+        
+        # Error tracking
+        self.error = None
+        self.error_code = None
+        self.error_details = {}
+        self.failed_tasks = []
 
     def add_task(self, task: Task) -> None:
         """
@@ -88,11 +102,39 @@ class Workflow:
     def set_status(self, status: str) -> None:
         """
         Update the status of the workflow.
+        
+        Args:
+            status: New status for the workflow (pending, running, completed, failed)
+            
+        Raises:
+            ValueError: If an invalid status is provided
         """
         valid_statuses = ["pending", "running", "completed", "failed"]
         if status not in valid_statuses:
             raise ValueError(f"Invalid status: {status}. Must be one of {valid_statuses}")
         self.status = status
+        
+        # If the workflow is marked as failed, record tasks that failed
+        if status == "failed":
+            self.failed_tasks = [
+                task_id for task_id, task in self.tasks.items() 
+                if task.status == "failed"
+            ]
+
+    def set_error(self, error_message: str, error_code: str = ErrorCode.FRAMEWORK_WORKFLOW_ERROR, details: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Set error information for the workflow.
+        
+        Args:
+            error_message: Human-readable error message
+            error_code: Error code from ErrorCode class
+            details: Additional error details
+        """
+        self.error = error_message
+        self.error_code = error_code
+        
+        if details:
+            self.error_details.update(details)
 
     def is_completed(self) -> bool:
         """
@@ -105,8 +147,11 @@ class Workflow:
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert the workflow to a dictionary representation.
+        
+        Returns:
+            Dictionary representation of the workflow
         """
-        return {
+        result = {
             "id": self.id,
             "name": self.name,
             "status": self.status,
@@ -114,6 +159,19 @@ class Workflow:
             "task_order": self.task_order,
             "current_task_index": self.current_task_index,
         }
+        
+        # Include error information if present
+        if self.error:
+            result["error"] = self.error
+            result["error_code"] = self.error_code
+            
+            if self.error_details:
+                result["error_details"] = self.error_details
+                
+            if self.failed_tasks:
+                result["failed_tasks"] = self.failed_tasks
+                
+        return result
 
     def __repr__(self) -> str:
         """String representation of the workflow."""

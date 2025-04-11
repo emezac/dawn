@@ -1,0 +1,17 @@
+Vector Store ID: vs_67f8ad0d8f6c8191876a0b514963310f
+Timestamp: 2025-04-11T02:43:02.113525
+Content Length: 1422
+
+--- CONTENT ---
+
+            LEGAL REVIEW SUMMARY
+            
+            Date: Current Date
+            
+            Contract Topics:
+            ${parse_topics_json.output_data.result.topics[0].title | 'Topic 1'} - ${parse_topics_json.output_data.result.topics[0].summary | 'No summary available'}
+            ${parse_topics_json.output_data.result.topics[1].title | 'Topic 2'} - ${parse_topics_json.output_data.result.topics[1].summary | 'No summary available'}
+            
+            Redline Summary:
+            {'redlines': [{'clause': 'Intellectual Property', 'current_text': 'All work product developed by Consultant in performing the Services shall be the sole and exclusive property of the Company. Consultant hereby assigns all right, title, and interest in such work product to the Company.', 'suggested_text': 'All work product developed by Consultant in performing the Services, excluding any pre-existing intellectual property, shall be the sole and exclusive property of the Company. Consultant hereby assigns all right, title, and interest in such work product to the Company.', 'explanation': 'To ensure that any pre-existing intellectual property of the Consultant is not inadvertently assigned to the Company.'}], 'summary': 'The suggested change in the Intellectual Property clause ensures that any pre-existing intellectual property of the Consultant is excluded from the assignment to the Company.'}
+            

@@ -1,0 +1,6 @@
+Vector Store ID: vs_67f8ad0d8f6c8191876a0b514963310f
+Timestamp: 2025-04-11T03:47:32.451672
+Content Length: 53
+
+--- CONTENT ---
+${structure_analysis.output_data.result.text_content}

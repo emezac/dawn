@@ -22,48 +22,114 @@ from core.utils.logger import (
     log_workflow_start,
 )
 from core.workflow import Workflow
+from core.errors import ErrorCode, DawnError, create_error_response
+from core.error_propagation import ErrorContext
 
 
 class WorkflowEngine:
     """
     Engine for executing workflows.
-    """
 
-    def __init__(self, workflow: Workflow, llm_interface: LLMInterface, tool_registry: ToolRegistry):
+    This class handles the execution of workflows by running their tasks
+    in the specified order, handling task failures, and maintaining the
+    state of the workflow.
+    """  # noqa: D202
+
+    def __init__(
+        self,
+        workflow: Workflow,
+        llm_interface: "LLMInterface",
+        tool_registry: "ToolRegistry",
+        services: "ServiceContainer" = None,
+    ):
+        """
+        Initialize a new WorkflowEngine.
+
+        Args:
+            workflow: The workflow to execute
+            llm_interface: Interface for executing LLM tasks
+            tool_registry: Registry of available tools
+            services: Optional service container for accessing shared services
+        """
         self.workflow = workflow
         self.llm_interface = llm_interface
         self.tool_registry = tool_registry
+        self.services = services
+        
+        # Initialize error context for tracking errors across tasks
+        self.error_context = ErrorContext(workflow_id=workflow.id)
 
     def process_task_input(self, task: Task) -> Dict[str, Any]:
         """
-        Resolve references to outputs of other tasks in the task's input data.
+        Process a task's input data, resolving references to outputs of previous tasks.
+        
+        Args:
+            task: The task whose input data should be processed
+            
+        Returns:
+            Processed input data with resolved references
         """
-        processed_input = task.input_data.copy()
+        processed_input = task.input_data.copy() if task.input_data else {}
+        
+        # Get all tasks that might be referenced
+        completed_tasks = {
+            task_id: t for task_id, t in self.workflow.tasks.items() 
+            if t.status in ["completed", "failed"] and t.id != task.id
+        }
+        
+        if not completed_tasks:
+            return processed_input
+            
+        # Process string values that might contain references
         for key, value in processed_input.items():
-            if isinstance(value, str):
+            if isinstance(value, str) and "${" in value:
+                # Look for references to task outputs
                 matches = re.findall(r"\${([^}]+)}", value)
                 for match in matches:
-                    parts = match.split(".")
-                    if len(parts) >= 2:
+                    # Check if this is an error reference
+                    if match.startswith("error."):
+                        # Extract the task ID and error path
+                        parts = match.split(".", 2)
+                        if len(parts) >= 3:
+                            task_id = parts[1]
+                            error_path = parts[2] if len(parts) > 2 else None
+                            
+                            # Try to get the error from the error context
+                            error_data = self.error_context.get_task_error(task_id)
+                            if error_data:
+                                # Get the error value using the provided path
+                                from core.error_propagation import get_error_value
+                                error_value = get_error_value(error_data, error_path)
+                                
+                                # Replace the reference with the error value
+                                if error_value is not None:
+                                    if value == f"${{{match}}}":
+                                        processed_input[key] = error_value
+                                        break
+                                    processed_input[key] = value.replace(f"${{{match}}}", str(error_value))
+                    else:
+                        # Standard task output reference
+                        parts = match.split(".")
                         ref_task_id = parts[0]
-                        try:
-                            ref_task = self.workflow.get_task(ref_task_id)
-                            if len(parts) == 2 and parts[1] == "output_data":
-                                replacement = ref_task.output_data
-                                if value == f"${{{match}}}":
-                                    processed_input[key] = replacement
-                                    break
-                                processed_input[key] = value.replace(f"${{{match}}}", str(replacement))
-                            elif len(parts) >= 3 and parts[1] == "output_data":
-                                field = parts[2]
-                                if field in ref_task.output_data:
-                                    replacement = ref_task.output_data[field]
+                        
+                        if ref_task_id in completed_tasks:
+                            ref_task = completed_tasks[ref_task_id]
+                            # Extract the referenced field from the task output
+                            field = ".".join(parts[1:]) if len(parts) > 1 else None
+                            try:
+                                if field:
+                                    replacement = ref_task.get_output_value(field)
+                                else:
+                                    replacement = ref_task.get_output_value()
+                                    
+                                if replacement is not None:
                                     if value == f"${{{match}}}":
                                         processed_input[key] = replacement
                                         break
                                     processed_input[key] = value.replace(f"${{{match}}}", str(replacement))
-                        except KeyError:
-                            log_error(f"Referenced task {ref_task_id} not found in workflow")
+                            except Exception as e:
+                                log_error(f"Error resolving reference ${{{match}}}: {str(e)}")
+        
         return processed_input
 
     def execute_task(self, task: Task) -> bool:
@@ -99,8 +165,17 @@ class WorkflowEngine:
         # Process the result
         if result.get("success", False):
             task.set_status("completed")
-            output_key = "response" if "response" in result else "result"
-            task.set_output({"response": result.get(output_key, {})})
+            # Preserve the complete result structure in the output
+            # Make sure both 'result' and 'response' are available for backward compatibility
+            output_data = result.copy()
+            
+            # Ensure at least one of result or response is set
+            if "result" in result and "response" not in result:
+                output_data["response"] = result["result"]
+            elif "response" in result and "result" not in result:
+                output_data["result"] = result["response"]
+                
+            task.set_output(output_data)
             log_task_end(task.id, task.name, "completed", self.workflow.id)
             return True
         else:
@@ -165,14 +240,48 @@ class WorkflowEngine:
             return result
 
     def handle_task_failure(self, task: Task, result: Dict[str, Any]) -> bool:
+        """
+        Handle a task failure by retrying if possible or recording the error.
+        
+        Args:
+            task: The task that failed
+            result: The error result from task execution
+            
+        Returns:
+            Boolean indicating if execution should continue
+        """
+        # Record the error in our error context
+        self.error_context.record_task_error(task.id, result)
+        
+        # Check if the task can be retried
         if task.can_retry():
             task.increment_retry()
             log_task_retry(task.id, task.name, task.retry_count, task.max_retries)
             task.set_status("pending")
             return self.execute_task(task)
         else:
+            # Task failed permanently
             task.set_status("failed")
-            task.set_output({"error": result.get("error", "Unknown error")})
+            
+            # Extract error details
+            error_message = result.get("error", "Unknown error")
+            error_code = result.get("error_code", ErrorCode.UNKNOWN_ERROR)
+            error_details = result.get("error_details", {})
+            
+            # Set detailed error output on the task
+            error_output = {
+                "success": False,
+                "error": error_message,
+                "error_code": error_code,
+                "error_details": error_details
+            }
+            
+            # Include any additional fields from the result
+            for key, value in result.items():
+                if key not in error_output and key != "annotations":
+                    error_output[key] = value
+            
+            task.set_output(error_output)
             log_task_end(task.id, task.name, "failed", self.workflow.id)
             return False
 
@@ -217,27 +326,50 @@ class WorkflowEngine:
         return self.workflow.tasks[task_id]
 
     def run(self) -> Dict[str, Any]:
+        """
+        Run the workflow by executing all its tasks in order.
+        
+        Returns:
+            Dict containing the workflow execution results
+        """
         log_workflow_start(self.workflow.id, self.workflow.name)
         self.workflow.set_status("running")
         self.workflow.current_task_index = 0
         current_task = self.get_next_task()
+        
         while current_task is not None and self.workflow.status != "failed":
             success = self.execute_task(current_task)
             if not success:
                 if current_task.next_task_id_on_failure:
                     current_task = self.get_next_task_by_condition(current_task)
                 else:
+                    # If no failure path is defined and error propagation is needed,
+                    # propagate the error to the workflow level
+                    latest_error = self.error_context.get_latest_error()
+                    self.workflow.set_error(
+                        latest_error.get("error", "Task execution failed") if latest_error else "Task execution failed",
+                        latest_error.get("error_code", ErrorCode.FRAMEWORK_WORKFLOW_ERROR) if latest_error else ErrorCode.FRAMEWORK_WORKFLOW_ERROR
+                    )
+                    
                     self.workflow.set_status("failed")
                     log_workflow_end(self.workflow.id, self.workflow.name, "failed")
                     break
             else:
                 current_task = self.get_next_task_by_condition(current_task)
+                
         if self.workflow.status != "failed":
             self.workflow.set_status("completed")
             log_workflow_end(self.workflow.id, self.workflow.name, "completed")
+            
+        # Include error summary in the result if there were errors
+        error_summary = None
+        if self.error_context.task_errors:
+            error_summary = self.error_context.get_error_summary()
+            
         return {
             "workflow_id": self.workflow.id,
             "workflow_name": self.workflow.name,
             "status": self.workflow.status,
             "tasks": {task_id: task.to_dict() for task_id, task in self.workflow.tasks.items()},
+            "error_summary": error_summary
         }

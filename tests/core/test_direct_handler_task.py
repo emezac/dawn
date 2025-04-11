@@ -202,7 +202,7 @@ class TestWorkflowEngineWithDirectHandler(unittest.TestCase):
 
         # 1. Create a DirectHandlerTask
         def direct_handler(data):
-            return {"success": True, "result": "Direct handler result"}
+            return {"success": True, "result": "Direct handler result", "response": "Direct handler result"}
 
         self.direct_task = DirectHandlerTask(
             task_id="direct_task", name="Direct Task", handler=direct_handler, next_task_id_on_success="llm_task"
@@ -230,7 +230,7 @@ class TestWorkflowEngineWithDirectHandler(unittest.TestCase):
 
         # Register a test tool
         def test_tool(**kwargs):
-            return {"result": "Tool result"}
+            return {"success": True, "result": "Tool result", "response": "Tool result"}
 
         self.registry.register_tool("test_tool", test_tool)
 
@@ -258,7 +258,9 @@ class TestWorkflowEngineWithDirectHandler(unittest.TestCase):
         self.assertEqual(self.tool_task.status, "completed")
 
         # Verify the direct handler task output
-        self.assertEqual(self.direct_task.output_data.get("response"), "Direct handler result")
+        self.assertTrue("result" in self.direct_task.output_data)
+        self.assertTrue(self.direct_task.output_data.get("success", False))
+        self.assertEqual(self.direct_task.output_data.get("result"), "Direct handler result")
 
 
 if __name__ == "__main__":

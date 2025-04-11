@@ -8,6 +8,7 @@ The AI Agent Framework is designed to enhance the capabilities of AI agents, all
 - **Web Search Tool**: Updated to use the latest model version with improved performance and reliability.
 - **Visualization of Workflow Execution**: Generate visual representations of workflows to aid in understanding and debugging.
 - **Vector Store ID Validation**: Robust utilities for validating OpenAI Vector Store IDs with different validation levels.
+- **Error Propagation Between Tasks**: Comprehensive error tracking and propagation system allowing downstream tasks to access and handle errors from upstream tasks.
 - **DirectHandlerTask Support:**
   - Register and use handler functions directly in workflows without needing global tool registry.
   - Improved task output and variable resolution for complex data structures.
@@ -111,6 +112,52 @@ except ValueError as e:
 ```
 
 For more details on vector store ID validation, see the [Vector Store ID Validation documentation](docs/vector_store_id_validation.md).
+
+### Error Propagation Between Tasks
+
+The framework now supports robust error propagation between tasks, allowing workflows to implement sophisticated error handling and recovery strategies.
+
+#### Usage Example
+
+```python
+# Define a task that might fail
+data_processing_task = Task(
+    task_id="process_data",
+    name="Process Data",
+    tool_name="data_processor",
+    input_data={"data_source": "customer_data.csv"},
+    next_task_id_on_success="analyze_data",  # Normal path on success
+    next_task_id_on_failure="handle_error"   # Error handling path on failure
+)
+
+# Define an error handler task
+error_handler_task = Task(
+    task_id="handle_error",
+    name="Error Handler",
+    tool_name="error_recovery_tool",
+    input_data={
+        # Access error information from the failed task
+        "error_message": "${error.process_data}",
+        "error_code": "${error.process_data.error_code}",
+        "error_details": "${error.process_data.error_details}",
+        "original_input": "customer_data.csv"
+    },
+    next_task_id_on_success="retry_processing",  # Try again if recovery succeeded
+    next_task_id_on_failure="report_failure"      # Report failure if recovery fails
+)
+
+# Add tasks to the workflow
+workflow.add_task(data_processing_task)
+workflow.add_task(error_handler_task)
+```
+
+The error propagation system automatically tracks errors across tasks and provides:
+- Detailed error information with standardized format
+- Error references in task inputs using the `${error.task_id}` syntax
+- Error propagation chains to track error origins
+- Workflow-level error summaries for monitoring and analysis
+
+For more details, see the [Error Propagation documentation](docs/error_propagation.md).
 
 ### DirectHandlerTask Support
 

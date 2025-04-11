@@ -7,6 +7,7 @@ This project is an open-source Python framework designed to simplify the develop
 ## Key Features
 
 - **Workflow Management System (WMS):** Supports sequential, parallel, and conditional workflows with monitored task execution and feedback integration.
+- **Error Handling and Propagation:** Robust error tracking and propagation between tasks, enabling sophisticated error recovery strategies.
 - **LLM Interface:** Compatible with popular APIs like OpenAI, providing a simple interface for language model interactions.
 - **Tool Integration:** Easy integration of custom tools, such as web search and file access.
 - **Observability:** Basic logging and tracing for debugging and workflow analysis.
@@ -54,6 +55,41 @@ workflow = [
 
 In this example, `task_1` and `task_2` can run in parallel, while `task_3` waits for both to complete.
 
+## Error Handling Example
+
+```python
+# Define a workflow with error handling
+workflow = Workflow("data_processing", "Data Processing with Error Handling")
+
+# Task that might fail
+task1 = Task(
+    task_id="validate_data",
+    name="Validate Input Data",
+    tool_name="data_validator", 
+    input_data={"data_source": "customer_records.csv"},
+    next_task_id_on_success="process_data",
+    next_task_id_on_failure="handle_validation_error"  # Error path
+)
+
+# Error handler task
+task2 = Task(
+    task_id="handle_validation_error",
+    name="Handle Validation Error",
+    tool_name="error_recovery_tool",
+    input_data={
+        "error_message": "${error.validate_data}",  # Reference to error from task1
+        "error_details": "${error.validate_data.error_details}"
+    },
+    next_task_id_on_success="retry_processing"  # Continue if recovery succeeds
+)
+
+# Add tasks to workflow
+workflow.add_task(task1)
+workflow.add_task(task2)
+```
+
+This workflow demonstrates how to implement error recovery using the error propagation system. For more details, see the [Error Propagation documentation](error_propagation.md).
+
 ## Testing
 
 Run the unit tests using:
@@ -63,7 +99,10 @@ PYTHONPATH=. python -m unittest discover tests
 
 ## Documentation
 
-For more detailed information, refer to the [Project Requirements Document](docs/PRD.md).
+- [Project Requirements Document](PRD.md)
+- [Error Propagation](error_propagation.md)
+- [Workflow Patterns](workflow_patterns.md)
+- [Error Codes Reference](error_codes_reference.md)
 
 ## Contributing
 

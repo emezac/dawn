@@ -306,6 +306,12 @@ class DirectHandlerTask(Task):
             # If success flag is not present, infer from presence of error
             if "success" not in result and "status" not in result:
                 result["success"] = "error" not in result
+                
+            # Ensure both 'result' and 'response' fields are present for backward compatibility
+            if "result" in result and "response" not in result:
+                result["response"] = result["result"]
+            elif "response" in result and "result" not in result:
+                result["result"] = result["response"]
             
             # Validate output if enabled
             if self.validate_output:

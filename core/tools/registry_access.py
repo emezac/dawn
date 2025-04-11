@@ -10,7 +10,9 @@ import os
 import logging
 from typing import Any, Dict, List, Optional, Callable
 
+from core.errors import ErrorCode
 from core.tools.registry import ToolRegistry
+from core.tools.response_format import create_error_response
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -83,40 +85,38 @@ def execute_tool(name: str, data: Dict[str, Any]) -> Dict[str, Any]:
         data: The input data for the tool
         
     Returns:
-        Dict: The result of the tool execution
+        Dict: The result of the tool execution in standardized format
     """
     registry = get_registry()
     
     if name not in registry.tools:
         logger.warning(f"Tool '{name}' not found in registry")
-        return {
-            "success": False,
-            "result": None,
-            "error": f"Tool '{name}' not found in registry",
-            "error_type": "ToolNotFound"
-        }
+        return create_error_response(
+            message=f"Tool '{name}' not found in registry",
+            error_code=ErrorCode.RESOURCE_NOT_FOUND,
+            details={"tool_name": name, "resource_type": "tool"}
+        )
     
     try:
         result = registry.execute_tool(name, data)
         return result
     except Exception as e:
         logger.error(f"Error executing tool '{name}': {e}")
-        return {
-            "success": False,
-            "result": None,
-            "error": f"Error executing tool '{name}': {str(e)}",
-            "error_type": type(e).__name__
-        }
+        return create_error_response(
+            message=f"Error executing tool '{name}': {str(e)}",
+            error_code=ErrorCode.EXECUTION_TOOL_FAILED,
+            details={"tool_name": name, "error_type": type(e).__name__}
+        )
 
-def get_available_tools() -> List[str]:
+def get_available_tools() -> List[Dict[str, Any]]:
     """
-    Get a list of names of all available tools.
+    Get metadata about all available tools.
     
     Returns:
-        List[str]: Names of all registered tools
+        List of dictionaries containing tool metadata
     """
     registry = get_registry()
-    return list(registry.tools.keys())
+    return registry.get_available_tools()
 
 def tool_exists(name: str) -> bool:
     """
