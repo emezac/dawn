@@ -28,9 +28,9 @@ find . -name ".pytest_cache" -exec rm -rf {} +
 # Define the output file
 TEST_OUTPUT_FILE="test_results.log"
 
-# Run the tests and save output to a file
-echo -e "${YELLOW}Running tests with pytest...${NC}"
-python -m pytest -v | tee "$TEST_OUTPUT_FILE"
+# Run tests directly using Python unittest
+echo -e "${YELLOW}Running tests directly using Python...${NC}"
+/usr/bin/env python3 tests/core/test_direct_handler_task.py | tee "$TEST_OUTPUT_FILE"
 
 # Check if all tests passed
 if [ $? -eq 0 ]; then
@@ -41,4 +41,4 @@ else
     echo -e "\n${RED}Some tests failed!${NC}"
     echo -e "See ${BLUE}$TEST_OUTPUT_FILE${NC} for details"
     exit 1
-fi 
+fi

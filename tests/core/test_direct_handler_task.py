@@ -2,9 +2,15 @@
 Tests for the DirectHandlerTask class and its integration with WorkflowEngine.
 """
 
+import sys
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
+# Add project root to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+# Now import modules using absolute imports
 from core.engine import WorkflowEngine
 from core.llm.interface import LLMInterface
 from core.task import DirectHandlerTask, Task
@@ -13,7 +19,7 @@ from core.workflow import Workflow
 
 
 class TestDirectHandlerTask(unittest.TestCase):
-    """Test the DirectHandlerTask class functionality."""
+    """Test the DirectHandlerTask class functionality."""  # noqa: D202
 
     def setUp(self):
         """Set up common test requirements."""
@@ -176,7 +182,7 @@ class TestDirectHandlerTask(unittest.TestCase):
 
 
 class TestWorkflowEngineWithDirectHandler(unittest.TestCase):
-    """Test the WorkflowEngine with DirectHandlerTask integration."""
+    """Test the WorkflowEngine with DirectHandlerTask integration."""  # noqa: D202
 
     def setUp(self):
         """Set up a workflow with multiple task types for testing."""
@@ -228,8 +234,9 @@ class TestWorkflowEngineWithDirectHandler(unittest.TestCase):
     def test_run_workflow_with_mixed_tasks(self):
         """Test running a workflow with DirectHandlerTask and regular tasks."""  # noqa: D202
 
-        # Set up the expected return paths
-        self.workflow.set_task_order(["direct_task", "llm_task", "tool_task"])
+        # Set up the expected task order - using the workflow's task_order attribute directly
+        # The Workflow class doesn't have a set_task_order method
+        self.workflow.task_order = ["direct_task", "llm_task", "tool_task"]
 
         # Run the workflow
         result = self.engine.run()
