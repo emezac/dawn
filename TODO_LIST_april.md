@@ -10,7 +10,7 @@
   - Add unit tests to verify behavior
   - Eliminate the need for monkey patching the `WorkflowEngine`
 
-- [ ] **Add plugin system for tool execution**
+- [x] **Add plugin system for tool execution**
   - Create a plugin architecture to allow registering custom task executors
   - Enable providing custom execution strategies without modifying core classes
   - Support middleware-style wrapping of task execution

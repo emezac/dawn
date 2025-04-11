@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from openai import APIConnectionError, APIError, BadRequestError, RateLimitError
 
@@ -8,10 +8,13 @@ from tools.openai_vs.create_vector_store import CreateVectorStoreTool
 from tools.web_search_tool import WebSearchTool
 from tools.write_markdown_tool import WriteMarkdownTool
 
+from core.tools.plugin import ToolPlugin
+from core.tools.plugin_manager import PluginManager
+
 
 # Optional: Define a custom exception for tool failures
 class ToolExecutionError(Exception):
-    """Custom exception for errors during tool execution."""
+    """Custom exception for errors during tool execution."""  # noqa: D202
 
     pass
 
@@ -20,13 +23,19 @@ class ToolRegistry:
     """
     Registry for tools that can be used by the agent.
     Initializes and provides access to tool handler methods.
-    """
+    """  # noqa: D202
 
     def __init__(self):
         """
         Initialize the tool registry and register the default tool handlers.
         """
         self.tools: Dict[str, Callable] = {}
+        
+        # Initialize plugin manager
+        self.plugin_manager = PluginManager()
+        self.plugin_namespaces: Set[str] = set()
+        
+        # Register legacy tools for backward compatibility
         self.register_tool("web_search", self.web_search_tool_handler)
         self.register_tool("file_read", self.file_read_tool_handler)
         self.register_tool("file_upload", self.file_upload_tool_handler)
@@ -55,6 +64,42 @@ class ToolRegistry:
             raise ValueError(f"Tool with name '{name}' already registered.")
         self.tools[name] = func
 
+    def register_plugin_namespace(self, namespace: str) -> None:
+        """
+        Register a namespace (package) where tool plugins can be found.
+        
+        Args:
+            namespace: The package namespace to register
+        """
+        if namespace not in self.plugin_namespaces:
+            self.plugin_namespaces.add(namespace)
+            self.plugin_manager.register_plugin_namespace(namespace)
+    
+    def load_plugins(self, reload: bool = False) -> None:
+        """
+        Load all plugins from registered namespaces and register them as tools.
+        
+        Args:
+            reload: Whether to reload already loaded plugins
+        """
+        # Load plugins through the plugin manager
+        self.plugin_manager.load_plugins(reload)
+        
+        # Register all plugins as tools
+        for name, plugin in self.plugin_manager.get_all_plugins().items():
+            if name not in self.tools or reload:
+                # Create a wrapper function to call the plugin's execute method
+                def plugin_wrapper(plugin_instance=plugin, **kwargs):
+                    # Validate parameters before executing
+                    validated_params = plugin_instance.validate_parameters(**kwargs)
+                    return plugin_instance.execute(**validated_params)
+                
+                try:
+                    self.register_tool(name, plugin_wrapper)
+                except ValueError:
+                    # Skip if the tool is already registered
+                    pass
+    
     def get_tool(self, name: str) -> Optional[Callable]:
         """
         Retrieve a tool function by its registered name.
@@ -147,10 +192,42 @@ class ToolRegistry:
                 "error": f"Unexpected Error: {str(e)}",
                 "error_type": type(e).__name__,
             }
+    
+    def get_available_tools(self) -> List[Dict[str, Any]]:
+        """
+        Get metadata about all available tools, both legacy and plugin-based.
+        
+        Returns:
+            List of dictionaries containing tool metadata
+        """
+        tool_metadata = []
+        
+        # Get plugin metadata
+        plugin_metadata = self.plugin_manager.get_plugin_metadata()
+        tool_metadata.extend(plugin_metadata)
+        
+        # Add legacy tools (tools not from plugins)
+        plugin_tool_names = {m["name"] for m in plugin_metadata}
+        plugin_tool_aliases = {alias for m in plugin_metadata for alias in m.get("aliases", [])}
+        
+        for name, func in self.tools.items():
+            # Skip plugin tools that are already included
+            if name in plugin_tool_names or name in plugin_tool_aliases:
+                continue
+                
+            # Create basic metadata for legacy tools
+            tool_metadata.append({
+                "name": name,
+                "aliases": [],
+                "description": func.__doc__ or "No description available",
+                "version": "legacy",
+                "is_legacy": True
+            })
+        
+        return tool_metadata
 
-    # --- Tool Handler Methods ---
-    # Handlers now simply call the underlying tool method and return its result.
-    # They rely on the tool method OR the execute_tool wrapper to handle exceptions.
+    # --- Legacy Tool Handler Methods ---
+    # These methods are kept for backward compatibility
 
     def web_search_tool_handler(self, **data) -> Any:
         """Handler for the Web Search tool."""
@@ -248,31 +325,22 @@ class ToolRegistry:
 
     def save_to_ltm_tool_handler(self, **data) -> Any:
         """Handler for the Save to LTM tool."""
-        from tools.openai_vs.save_text_to_vector_store import SaveTextToVectorStoreTool
+        from tools.openai_vs.save_to_ltm import SaveToLTMTool
 
-        save_tool = SaveTextToVectorStoreTool()
+        save_tool = SaveToLTMTool()
         vector_store_id = data.get("vector_store_id", "")
-        text_content = data.get("text_content", "")
-
-        # Add debugging information
-        print(
-            f"\nDebug - save_to_ltm_tool_handler received vector_store_id: "
-            f"'{vector_store_id}', Type: {type(vector_store_id)}"
-        )
-        print(f"Debug - text_content first 50 chars: '{text_content[:50]}...'")
+        text = data.get("text", "")
 
         if not vector_store_id:
             raise ValueError("Missing 'vector_store_id' for saving to LTM.")
-        if not text_content:
-            raise ValueError("Missing 'text_content' for saving to LTM.")
+        if not text:
+            raise ValueError("Missing 'text' for saving to LTM.")
 
-        try:
-            result = save_tool.save_text_to_vector_store(vector_store_id, text_content)
-            print(f"Debug - save_text_to_vector_store returned: {result}")
-            return result
-        except Exception as e:
-            print(f"Debug - Exception in save_to_ltm_tool_handler: {str(e)}")
-            raise e
+        # Validate vector_store_id format
+        if not vector_store_id.startswith("vs_"):
+            raise ValueError(f"Invalid vector_store_id format: '{vector_store_id}'. Must start with 'vs_'.")
+
+        return save_tool.save_text_to_vector_store(vector_store_id, text)
 
     def list_vector_stores_tool_handler(self, **data) -> Any:
         """Handler for the List Vector Stores tool."""
@@ -289,31 +357,22 @@ class ToolRegistry:
         vector_store_id = data.get("vector_store_id", "")
 
         if not vector_store_id:
-            raise ValueError("Missing 'vector_store_id' for vector store deletion.")
+            raise ValueError("Missing 'vector_store_id' for deletion.")
+
+        # Validate vector_store_id format
+        if not vector_store_id.startswith("vs_"):
+            raise ValueError(f"Invalid vector_store_id format: '{vector_store_id}'. Must start with 'vs_'.")
 
         return delete_tool.delete_vector_store(vector_store_id)
 
     def create_vector_store_handler(self, **data) -> Any:
         """Handler for the Create Vector Store tool."""
-        create_vs_tool = CreateVectorStoreTool()
+        # Import here to avoid circular import
+        tool = CreateVectorStoreTool()
         name = data.get("name", "")
-        file_ids = data.get("file_ids", [])
 
         if not name:
             raise ValueError("Missing 'name' parameter for vector store creation.")
 
-        # Call the tool and let it handle file_ids validation
-        result = create_vs_tool.create_vector_store(name, file_ids)
-
-        # Check if we got an error dictionary instead of a vector store ID
-        if isinstance(result, dict) and "error" in result:
-            raise ToolExecutionError(result["error"])
-
-        # Import here to avoid circular imports
-        from tools.openai_vs.utils.vs_id_validator import is_valid_vector_store_id
-
-        # Use the validator to check the result
-        if not is_valid_vector_store_id(result):
-            raise ToolExecutionError(f"Invalid vector store ID format received: {result}")
-
-        return result
+        file_ids = data.get("file_ids", [])
+        return tool.create_vector_store(name, file_ids)
