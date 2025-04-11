@@ -12,17 +12,22 @@ from unittest.mock import MagicMock, patch
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
+from core.tools.registry_access import get_registry, reset_registry
 from tools.openai_vs.delete_vector_store import DeleteVectorStoreTool
 from tools.openai_vs.save_text_to_vector_store import SaveTextToVectorStoreTool
 from tools.openai_vs.upload_file_to_vector_store import UploadFileToVectorStoreTool
+from tools.openai_vs.utils import extract_and_validate_vector_store_ids
 
 
 class TestVectorStoreIDValidation(unittest.TestCase):
-    """Test suite for vector store ID validation across different tools."""
+    """Test suite for vector store ID validation across different tools."""  # noqa: D202
 
     def setUp(self):
         """Set up test fixtures."""
-        self.registry = ToolRegistry()
+        # Reset the registry before each test
+        reset_registry()
+        # Get the singleton instance
+        self.registry = get_registry()
         self.delete_tool = DeleteVectorStoreTool(client=MagicMock())
         self.upload_tool = UploadFileToVectorStoreTool(client=MagicMock())
         self.save_tool = SaveTextToVectorStoreTool(client=MagicMock())

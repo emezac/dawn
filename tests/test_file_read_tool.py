@@ -8,12 +8,21 @@ from unittest.mock import patch
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Now import after path setup
 from core.tools.registry import ToolRegistry  # noqa: E402
+# Import the singleton access function and services
+from core.tools.registry_access import get_registry, reset_registry
+from core.services import get_services, reset_services
 
 
 class TestFileReadTool(unittest.TestCase):
     def setUp(self):
         """Set up the tool registry for testing."""
-        self.registry = ToolRegistry()
+        # Reset both the registry singleton and services container
+        reset_registry()
+        reset_services()
+        
+        # Get the registry from the services container
+        services = get_services()
+        self.registry = services.tool_registry
 
     @patch("core.tools.registry.ToolRegistry.execute_tool")  # Patch registry's execute_tool method
     def test_file_read(self, mock_execute_tool):

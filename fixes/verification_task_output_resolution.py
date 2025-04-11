@@ -14,6 +14,8 @@ import sys
 import time
 from datetime import datetime
 from typing import Any, Dict, List
+import logging
+from dotenv import load_dotenv
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,6 +25,7 @@ from core.llm.interface import LLMInterface
 from core.task import DirectHandlerTask, Task
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
+from core.tools.registry_access import get_registry, register_tool
 
 
 def create_nested_data_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -259,14 +262,13 @@ def verify_improvements():
     workflow.add_task(task4)
     
     # Create agent
-    registry = ToolRegistry()
     llm_interface = LLMInterface()
     
     agent = Agent(
         agent_id="verification_agent",
         name="Verification Agent",
         llm_interface=llm_interface,
-        tool_registry=registry
+        tool_registry=get_registry()
     )
     agent.load_workflow(workflow)
     
@@ -300,6 +302,18 @@ def verify_improvements():
     
     print("\n✓ Verification completed successfully!")
     print("The improved variable resolution features are working properly with both engines.")
+
+
+def main():
+    # --- Setup ---
+    logging.basicConfig(level=logging.INFO)
+    load_dotenv()
+
+    # Get the singleton registry
+    registry = get_registry()
+
+    # Register mock tool
+    # ... existing code ...
 
 
 if __name__ == "__main__":

@@ -164,12 +164,6 @@ def main():
     """Run the enhanced variable resolution example workflow."""
     logger.info("Starting Enhanced Variable Resolution Example")
     
-    # Create an Agent
-    agent = Agent(
-        agent_id="enhanced_var_resolution_agent",
-        name="Enhanced Variable Resolution Agent"
-    )
-    
     # Create a workflow
     workflow = Workflow(
         workflow_id="enhanced_variable_workflow",
@@ -220,10 +214,16 @@ def main():
     workflow.add_task(task2)
     workflow.add_task(task3)
     
-    # Load workflow into agent
+    # Create Agent
+    registry = get_registry() # Get the singleton registry
+    agent = Agent(
+        agent_id="var_res_agent_enhanced",
+        name="Enhanced Variable Resolution Agent",
+        tool_registry=registry # Pass the registry
+    )
     agent.load_workflow(workflow)
     
-    # Run the workflow
+    # Run workflow synchronously
     logger.info("Executing workflow")
     result = agent.run()
     

@@ -11,12 +11,21 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
 from tools.openai_vs.delete_vector_store import DeleteVectorStoreTool
+# Import the singleton access function
+from core.tools.registry_access import get_registry, reset_registry
 
+# Mock functions for tools
+def mock_list_vector_stores(input_data):
+    # Simulate returning a list of stores
+    return {"success": True, "result": [{"id": "vs_test123", "name": "Test Store"}, {"id": "vs_other", "name": "Other"}]}
 
 class TestDeleteVectorStoreTool(unittest.TestCase):
     def setUp(self):
         """Set up for testing."""
-        self.registry = ToolRegistry()
+        # Reset the registry before each test
+        reset_registry()
+        # Get the singleton instance
+        self.registry = get_registry()
         
         self.mock_client = MagicMock()
         
@@ -26,6 +35,9 @@ class TestDeleteVectorStoreTool(unittest.TestCase):
         self.tool = DeleteVectorStoreTool(client=self.mock_client)
 
         self.test_vector_store_id = "vs_test123"
+
+        # Register mock tools
+        self.registry.register_tool("list_vector_stores", mock_list_vector_stores, replace=True)
 
     def test_delete_vector_store_validation(self):
         """Test input validation for delete_vector_store."""

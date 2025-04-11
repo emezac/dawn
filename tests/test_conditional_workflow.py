@@ -1,14 +1,15 @@
 import os
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 # Add parent directory to path to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.engine import WorkflowEngine
 from core.llm.interface import LLMInterface
-from core.task import Task
 from core.tools.registry import ToolRegistry
+from core.tools.registry_access import get_registry
+from core.task import Task
 from core.workflow import Workflow
 from tools.basic_tools import calculate, check_length
 
@@ -79,8 +80,9 @@ class TestConditionalWorkflow(unittest.TestCase):
         # Create the workflow engine.
         self.engine = WorkflowEngine(
             workflow=self.workflow,
-            llm_interface=self.llm_interface,
-            tool_registry=ToolRegistry(),  # Using default registry
+            llm_interface=MagicMock(spec=LLMInterface),
+            # Use the singleton registry
+            tool_registry=get_registry(),
         )
 
     def test_conditional_branch(self):

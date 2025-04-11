@@ -5,27 +5,34 @@ Example script demonstrating how to create and use vector stores.
 import os
 import sys
 import tempfile
+import logging
+from dotenv import load_dotenv
 
 # Add the project root to the Python path to allow importing from the project modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
+# Import the singleton access function
+from core.tools.registry_access import get_registry
 
+# --- Setup ---
+logging.basicConfig(level=logging.INFO)
+load_dotenv()
+
+# Get the singleton registry
+registry = get_registry()
 
 def main():
     """
     Demonstrate how to create and use an OpenAI Vector Store.
     """
-    # Initialize the tool registry
-    registry = ToolRegistry()
-
     # Step 1: Create a sample text file to upload
     print("\n=== Step 1: Creating a sample text file ===")
     sample_text = """
     This is a sample document about artificial intelligence.
     AI systems can process large amounts of data and extract insights.
     Vector stores are useful for storing and retrieving information using semantic similarity.
-    """
+    """  # noqa: D202
 
     with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".txt") as temp_file:
         temp_file.write(sample_text)

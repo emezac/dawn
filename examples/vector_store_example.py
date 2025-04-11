@@ -1,10 +1,14 @@
 import os
 import sys
+import logging
+from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
+from core.tools.registry_access import get_registry
 
+# --- Setup ---
 
 def main():
     # Initialize the tool registry

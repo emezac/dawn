@@ -936,9 +936,11 @@ def main():
                     delattr(task, 'dependencies')
     
         # Step 3: Create an agent and assign the workflow
+        registry = get_registry() # Get the singleton registry
         agent = Agent(
-            agent_id="legal_review_agent",
-            name="Legal Contract Review Agent"
+            agent_id="context_aware_legal_reviewer", 
+            name="Context-Aware Legal Review Agent",
+            tool_registry=registry # Pass the registry
         )
         agent.load_workflow(workflow)
         

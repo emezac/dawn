@@ -36,6 +36,9 @@ try:
     from core.agent import Agent
 
     print("Imported Agent")
+    from core.tools.registry_access import get_registry
+
+    print("Imported get_registry")
 
     # Display original class information
     print("\n--- Original Class Info ---")
@@ -284,7 +287,7 @@ try:
     # Test ToolRegistry with get_tool_names
     print("\nTesting ToolRegistry.get_tool_names...")
     try:
-        registry = ToolRegistry()
+        registry = get_registry()
         tool_names = registry.get_tool_names()
         print(f"ToolRegistry has tools: {tool_names}")
     except Exception as e:
@@ -298,7 +301,7 @@ try:
     # Test ToolRegistry with register_tool
     print("\nTesting ToolRegistry.register_tool with extra parameters...")
     try:
-        registry = ToolRegistry()
+        registry = get_registry()
         registry.register_tool("test_tool", "Test Tool Description", {"input": "string"}, dummy_handler)
         print(f"Tool registered successfully")
         print(f"Registry now has tools: {registry.get_tool_names()}")
@@ -324,7 +327,13 @@ try:
         workflow.add_task(task)
 
         # Create an agent with the mock LLM and load the workflow
-        agent = Agent(agent_id="test_agent", name="Test Agent", llm_interface=mock_llm)
+        registry = get_registry()
+        agent = Agent(
+            agent_id="test_agent", 
+            name="Test Agent", 
+            llm_interface=mock_llm,
+            tool_registry=registry
+        )
         agent.load_workflow(workflow)
 
         # Test get_execution_history before run

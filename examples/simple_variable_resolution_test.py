@@ -178,10 +178,12 @@ def main():
     workflow.add_task(task2)
     workflow.add_task(task3)
     
-    # Create agent and load workflow
+    # Create Agent
+    registry = get_registry() # Get the singleton registry
     agent = Agent(
-        agent_id="variable_resolution_agent",
-        name="Variable Resolution Agent"
+        agent_id="simple_var_res_agent",
+        name="Simple Variable Resolution Agent",
+        tool_registry=registry # Pass the registry
     )
     agent.load_workflow(workflow)
     

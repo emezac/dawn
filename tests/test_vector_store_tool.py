@@ -7,12 +7,17 @@ from unittest.mock import MagicMock, patch
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
+# Import the singleton access function
+from core.tools.registry_access import get_registry, reset_registry
 
 
 class TestVectorStoreTool(unittest.TestCase):
     def setUp(self):
         """Set up the tool registry for testing."""
-        self.registry = ToolRegistry()
+        # Reset the registry before each test
+        reset_registry()
+        # Get the singleton instance
+        self.registry = get_registry()
 
         # Directly modify the vector_store_create handler for testing
         self.original_handler = self.registry.tools.get("vector_store_create")

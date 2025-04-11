@@ -11,12 +11,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
 from tools.openai_vs.list_vector_stores import ListVectorStoresTool
+from core.tools.registry_access import get_registry, reset_registry
 
 
 class TestListVectorStoresTool(unittest.TestCase):
     def setUp(self):
         """Set up for testing."""
-        self.registry = ToolRegistry()
+        reset_registry()
+        self.registry = get_registry()
         
         self.mock_client = MagicMock()
         

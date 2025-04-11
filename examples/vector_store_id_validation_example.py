@@ -4,6 +4,8 @@ Example showing how to use the vector store ID validation utilities.
 
 import os
 import sys
+import logging
+from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -14,7 +16,14 @@ from tools.openai_vs.utils.vs_id_validator import (
     is_valid_vector_store_id,
     validate_vector_store_id,
 )
+from core.tools.registry_access import get_registry
 
+# --- Setup ---
+logging.basicConfig(level=logging.INFO)
+load_dotenv()
+
+# Get the singleton registry
+registry = get_registry()
 
 def demonstrate_validation():
     """Demonstrate different validation methods using examples."""

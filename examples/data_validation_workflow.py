@@ -197,12 +197,6 @@ def main():
     """Run the data validation workflow example."""
     logger.info("Starting Data Validation Workflow Example")
     
-    # Create an Agent
-    agent = Agent(
-        agent_id="data_validation_agent",
-        name="Data Validation Agent"
-    )
-    
     # Create a workflow
     workflow = Workflow(
         workflow_id="data_validation_workflow",
@@ -297,7 +291,13 @@ def main():
     # Set first task's next tasks based on validation outcome
     task1.next_task_id_on_success = None  # Will be determined by conditional tasks
     
-    # Load workflow into agent
+    # Create agent
+    registry = get_registry() # Get the singleton registry
+    agent = Agent(
+        agent_id="validation_agent", 
+        name="Data Validation Agent",
+        tool_registry=registry # Pass the registry
+    )
     agent.load_workflow(workflow)
     
     # Run the workflow

@@ -436,9 +436,11 @@ def main():
                 delattr(task, 'dependencies')
 
     # Create agent with workflow
+    registry = get_registry() # Get the singleton registry
     agent = Agent(
         agent_id="complex_conditional_agent",
-        name="Complex Conditional Workflow Agent"
+        name="Complex Conditional Workflow Agent",
+        tool_registry=registry # Pass the registry
     )
     agent.load_workflow(workflow)
 

@@ -13,6 +13,13 @@ The AI Agent Framework is designed to enhance the capabilities of AI agents, all
   - Improved task output and variable resolution for complex data structures.
   - Support for both synchronous and asynchronous workflow engines.
   - Enhanced debugging and error reporting for task execution.
+- **Observability:**
+  - Logging and tracing to support debugging and workflow analysis.
+- **Services Container:**
+  - Centralized dependency management for framework-wide singletons
+  - Type-safe access to shared services like ToolRegistry and LLMInterface
+  - Proper dependency injection support throughout the framework
+  - Simplified management of service lifecycle and configuration
 
 ## Usage
 
@@ -104,6 +111,56 @@ except ValueError as e:
 ```
 
 For more details on vector store ID validation, see the [Vector Store ID Validation documentation](docs/vector_store_id_validation.md).
+
+### DirectHandlerTask Support
+
+```python
+from core.task import DirectHandlerTask
+
+# Define a handler function
+def my_custom_handler(input_data):
+    result = process_data(input_data["value"])
+    return {"success": True, "result": result}
+
+# Create a task with the direct handler
+task = DirectHandlerTask(
+    task_id="custom_processor",
+    name="Custom Data Processor",
+    handler=my_custom_handler,
+    input_data={"value": "sample_data"}
+)
+
+# Add to workflow
+workflow.add_task(task)
+```
+
+### Services Container
+
+The Services Container provides centralized management of framework dependencies and ensures consistent access to singleton services.
+
+```python
+from core.services import get_services
+
+# Get the services container
+services = get_services()
+
+# Access the tool registry (singleton)
+registry = services.tool_registry
+
+# Register a custom LLM interface
+from core.llm.interface import LLMInterface
+llm = LLMInterface(model="gpt-4")
+services.register_llm_interface(llm, name="gpt4_interface")
+
+# Create an agent using services
+agent = Agent(
+    agent_id="my_agent",
+    name="My Agent",
+    # The registry will be automatically provided from the services container
+    # Use a specific named LLM interface
+    llm_interface=services.get_llm_interface("gpt4_interface")
+)
+```
 
 ## Examples
 

@@ -16,14 +16,19 @@ from core.llm.interface import LLMInterface
 from core.task import DirectHandlerTask, Task
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
+# Import the singleton access function
+from core.tools.registry_access import get_registry, reset_registry
 
 
 class TestDirectHandlerTask(unittest.TestCase):
     """Test the DirectHandlerTask class functionality."""  # noqa: D202
 
     def setUp(self):
-        """Set up common test requirements."""
-        self.registry = ToolRegistry()
+        """Set up for testing."""
+        # Reset the registry before each test
+        reset_registry()
+        # Get the singleton instance
+        self.registry = get_registry()
         self.llm_interface = MagicMock(spec=LLMInterface)
         self.workflow = Workflow(workflow_id="test_workflow", name="Test Workflow")
 
@@ -185,8 +190,11 @@ class TestWorkflowEngineWithDirectHandler(unittest.TestCase):
     """Test the WorkflowEngine with DirectHandlerTask integration."""  # noqa: D202
 
     def setUp(self):
-        """Set up a workflow with multiple task types for testing."""
-        self.registry = ToolRegistry()
+        """Set up for workflow tests."""
+        # Reset the registry before each test
+        reset_registry()
+        # Get the singleton instance
+        self.registry = get_registry()
         self.llm_interface = MagicMock(spec=LLMInterface)
 
         # Create a workflow with multiple task types

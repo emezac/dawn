@@ -3,7 +3,7 @@ Final Complex Workflow Example (Sequential Execution with Manual Variable Substi
 
 This workflow does the following:
 1. Uploads a training document using the file upload tool.
-2. Creates a vector store using the uploaded file’s ID.
+2. Creates a vector store using the uploaded file's ID.
 3. Extracts document insights via file search (RAG) using the vector store.
 4. Performs a web search for supplementary information on AI ethics.
 5. Uses an LLM to generate a combined summary.
@@ -14,6 +14,8 @@ Each task is executed sequentially with outputs from previous tasks substituted 
 
 import os
 import sys
+import logging
+from typing import Dict, Any
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -21,7 +23,10 @@ from openai import OpenAI
 # Add parent directory to path to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.tools.registry import ToolRegistry
+from core.workflow import Workflow
+from core.tools.registry import ToolRegistry # Keep for type hint
+# Import the singleton access function
+from core.tools.registry_access import get_registry, register_tool
 
 # Load environment variables from .env file
 load_dotenv()
@@ -46,8 +51,8 @@ def call_openai(prompt):
 def main():
     print("Starting Final Complex Workflow Example (Sequential Execution)")
 
-    # Instantiate the tool registry (it registers file_upload, vector_store_create, file_read, web_search, write_markdown)
-    registry = ToolRegistry()
+    # Get the singleton registry
+    registry = get_registry()
 
     # ------------------
     # Task 1: File Upload
@@ -159,4 +164,14 @@ def main():
 
 
 if __name__ == "__main__":
+    # --- Setup ---
+    logging.basicConfig(level=logging.INFO)
+    load_dotenv()
+
+    # Get the singleton registry
+    registry = get_registry()
+
+    # Register custom tools
+    # ... existing code ...
+
     main()

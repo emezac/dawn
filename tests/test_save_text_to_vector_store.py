@@ -11,12 +11,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
 from tools.openai_vs.save_text_to_vector_store import SaveTextToVectorStoreTool
+from core.tools.registry_access import get_registry, reset_registry
 
 
 class TestSaveTextToVectorStoreTool(unittest.TestCase):
     def setUp(self):
         """Set up for testing."""
-        self.registry = ToolRegistry()
+        reset_registry()
+        self.registry = get_registry()
 
         self.mock_client = MagicMock()
 

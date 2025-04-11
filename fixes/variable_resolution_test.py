@@ -18,6 +18,7 @@ from core.llm.interface import LLMInterface
 from core.task import DirectHandlerTask, Task
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
+from core.tools.registry_access import get_registry
 
 
 # Define Direct Handler functions
@@ -118,14 +119,14 @@ def test_variable_resolution():
     
     # Create agent and load workflow
     print("Creating agent and loading workflow...")
-    registry = ToolRegistry()
+    registry = get_registry()
     llm_interface = LLMInterface()
     
     agent = Agent(
         agent_id="test_agent",
         name="Test Agent",
         llm_interface=llm_interface,
-        tool_registry=registry
+        tool_registry=get_registry()
     )
     agent.load_workflow(workflow)
     

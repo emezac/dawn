@@ -52,9 +52,11 @@ def main():
     print("Starting AI Agent Framework Example")
 
     # Create an agent
+    registry = get_registry() # Get the singleton registry
     agent = Agent(
-        agent_id="example_agent",
-        name="Example Agent",
+        agent_id="simple_agent",
+        name="Simple Example Agent",
+        tool_registry=registry # Pass the registry
     )
 
     # Register tools

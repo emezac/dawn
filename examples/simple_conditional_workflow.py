@@ -58,13 +58,6 @@ def execute_llm_task(task):
 def main():
     print("Starting Conditional Workflow Example")
 
-    # Create an agent
-    agent = Agent(agent_id="conditional_agent", name="Conditional Agent")
-
-    # Register tools (existing basic tools)
-    agent.register_tool("calculate", calculate)
-    agent.register_tool("check_length", check_length)
-
     # Create a workflow
     workflow = Workflow(workflow_id="conditional_workflow", name="Conditional Workflow Example")
 
@@ -151,8 +144,16 @@ def main():
     # If check_email_length fails (e.g. email is too short), the engine will follow the failure branch
     # and execute generate_longer_email. If it succeeds, it will continue with calculate_metrics.
 
-    # Load workflow into agent and run it
+    # Create Agent
+    registry = get_registry() # Get the singleton registry
+    agent = Agent(
+        agent_id="conditional_agent", 
+        name="Conditional Agent",
+        tool_registry=registry # Pass the registry
+    )
     agent.load_workflow(workflow)
+    
+    # Run the workflow
     results = agent.run()
 
     # Execute LLM tasks

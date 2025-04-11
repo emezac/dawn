@@ -12,12 +12,16 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
 from tools.openai_vs.upload_file_to_vector_store import UploadFileToVectorStoreTool
+from core.tools.registry_access import get_registry, reset_registry
 
 
 class TestUploadFileToVectorStoreTool(unittest.TestCase):
     def setUp(self):
         """Set up for testing."""
-        self.registry = ToolRegistry()
+        # Reset the registry before each test
+        reset_registry()
+        # Get the singleton instance
+        self.registry = get_registry()
 
         self.mock_client = MagicMock()
         self.mock_client.api_key = "test-api-key"

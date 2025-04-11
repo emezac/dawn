@@ -487,12 +487,6 @@ def main():
     """Run the complex workflow with enhanced variable resolution example."""
     logger.info("Starting Complex Workflow with Enhanced Variable Resolution")
     
-    # Create an Agent
-    agent = Agent(
-        agent_id="complex_analytics_agent",
-        name="Complex Analytics Agent"
-    )
-    
     # Create a workflow
     workflow = Workflow(
         workflow_id="complex_analytics_workflow",
@@ -636,10 +630,16 @@ def main():
     workflow.add_task(task4)
     workflow.add_task(task5)
     
-    # Load workflow into agent
+    # --- Create Agent ---
+    registry = get_registry() # Get the singleton registry
+    agent = Agent(
+        agent_id="complex_validated_agent",
+        name="Complex Workflow Agent with Validation",
+        tool_registry=registry # Pass the registry
+    )
     agent.load_workflow(workflow)
     
-    # Run the workflow
+    # --- Execute Workflow ---
     logger.info("Executing workflow")
     result = agent.run()
     

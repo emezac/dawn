@@ -6,14 +6,21 @@ It manages workflows, interfaces with LLMs, and coordinates tool execution.
 """
 
 import asyncio
+import os
+import sys
 from typing import Any, Callable, Dict, Optional
 
-from core.async_workflow_engine import AsyncWorkflowEngine
+from core.tools.registry_access import get_registry
 from core.engine import WorkflowEngine
+from core.async_workflow_engine import AsyncWorkflowEngine
+from core.workflow import Workflow
 from core.llm.interface import LLMInterface
 from core.tools.registry import ToolRegistry
-from core.utils.logger import log_error
-from core.workflow import Workflow
+from core.utils.logger import log_error, log_info
+from core.services import get_services
+
+# Add parent directory to path if needed (e.g., for running tests)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class Agent:
@@ -22,7 +29,7 @@ class Agent:
     Manages workflows, LLM interfaces, and tool registries. The Agent class
     serves as the primary interface for users of the framework, handling
     the loading and execution of workflows.
-    """
+    """  # noqa: D202
 
     def __init__(
         self,
@@ -39,15 +46,24 @@ class Agent:
             agent_id: Unique identifier for the agen
             name: Human-readable name for the agen
             llm_interface: LLMInterface instance, or None to create a default one
-            tool_registry: ToolRegistry instance, or None to create a default one
+            tool_registry: ToolRegistry instance. If None, uses the one from the services container.
             api_key: API key for LLM service if no interface is provided
             model: Model name to use if no interface is provided
         """
         self.id = agent_id
         self.name = name
+        
+        # Initialize LLM interface
         self.llm_interface = llm_interface or LLMInterface(api_key=api_key, model=model)
-
-        self.tool_registry = tool_registry or ToolRegistry()
+        
+        # Initialize tool registry
+        if tool_registry is None:
+            # Get the tool registry from the services container
+            services = get_services()
+            self.tool_registry = services.tool_registry
+        else:
+            self.tool_registry = tool_registry
+            
         self.workflow: Optional[Workflow] = None
         self.last_results: Optional[Dict[str, Any]] = None
 

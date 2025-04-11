@@ -40,10 +40,11 @@
   - Added comprehensive unit tests for registry access utilities
   - Documented best practices for registry access in the codebase
 
-- [ ] **Implement singleton patterns correctly**
-  - Fix tool registry instantiation to ensure consistent instance usage
-  - Add proper dependency injection for registry access
-  - Create a services container for framework-wide dependencies
+- [x] **Implement singleton patterns correctly**
+  - Fixed tool registry instantiation to ensure consistent instance usage
+  - Added proper dependency injection for registry access
+  - Created a services container for framework-wide dependencies
+  - Updated tests and examples to use the services container pattern
 
 ### 3. Error Handling and Reporting
 

@@ -4,6 +4,7 @@ import sys
 import json
 from typing import Dict, Any, List, Optional, Union, TypedDict, Literal
 from datetime import datetime
+import logging
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -16,6 +17,7 @@ from core.utils.visualizer import visualize_workflow
 from core.utils.variable_resolver import resolve_variables
 from core.utils.data_validator import validate_data, ValidationError
 from core.workflow import Workflow
+from core.tools.registry_access import get_registry, register_tool
 
 # Utility function for parsing structured task outputs
 def extract_task_output(task_output, field_path=None):
@@ -337,8 +339,12 @@ def main():
     print("Starting Complex Parallel Workflow Example")
     print("==========================================")
     
-    # --- Initialize Tool Registry ---
-    registry = ToolRegistry()
+    # --- Setup ---
+    logging.basicConfig(level=logging.INFO)
+    load_dotenv()
+
+    # Get the singleton registry
+    registry = get_registry()
     
     # --- Create Vector Stores ---
     print("\nCreating vector stores...")
@@ -368,7 +374,31 @@ def main():
         name="Upload AI Ethics Document",
         tool_name="file_upload",
         input_data={
-            "file_path": "./examples/pdfs/ai_ethics_example.txt",
+            # Create the content inline if the file doesn't exist
+            "file_content": """# Principles of AI Ethics
+
+## Fairness
+AI systems should treat all people fairly and not discriminate based on race, gender, age, or other protected characteristics.
+
+## Transparency
+AI systems should operate in a transparent manner. Users should be informed when they are interacting with AI.
+
+## Privacy and Security
+AI systems should respect user privacy and be secure. Personal data should be protected.
+
+## Human Oversight
+AI systems should be designed to enable human oversight and control.
+
+## Accountability
+Organizations developing and deploying AI should be accountable for their systems' impacts.
+
+## Reliability and Safety
+AI systems should operate reliably and safely.
+
+## Social and Environmental Well-being
+The broader societal and environmental impacts of AI should be considered throughout the system's lifecycle.
+""",
+            "file_name": "ai_ethics_example.txt",
             "purpose": "vector_db"
         },
         next_task_id_on_success="create_vector_store_task",
@@ -505,7 +535,8 @@ def main():
     print("\nCreating agent and loading workflow...")
     agent = Agent(
         agent_id=f"complex_parallel_agent_{timestamp}",
-        name="Complex Parallel Workflow Agent"
+        name="Complex Parallel Workflow Agent",
+        tool_registry=registry
     )
     
     # Check for DirectHandlerTask dependencies attribute issues

@@ -13,12 +13,15 @@ It shows how to:
 import os
 import sys
 import tempfile
+import logging
+from dotenv import load_dotenv
 
 # Add project root to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.tools.plugin import ToolPlugin
 from core.tools.registry import ToolRegistry
+from core.tools.registry_access import get_registry
 
 
 # Define a simple custom plugin for the example
@@ -83,8 +86,8 @@ def main():
     print("Dawn Framework Plugin System Example")
     print("===================================")
     
-    # Create the tool registry
-    registry = ToolRegistry()
+    # Get the singleton registry
+    registry = get_registry()
     
     # Register the built-in plugin namespace
     registry.register_plugin_namespace("plugins.tools")

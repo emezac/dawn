@@ -1,10 +1,19 @@
 import os
 import sys
+import logging
+from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
+from core.tools.registry_access import get_registry
 
+# --- Setup ---
+logging.basicConfig(level=logging.INFO)
+load_dotenv()
+
+# Get the singleton registry
+registry = get_registry()
 
 def main():
     # Initialize the tool registry

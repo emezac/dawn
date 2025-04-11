@@ -7,18 +7,23 @@ from unittest.mock import MagicMock, patch
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.tools.registry import ToolRegistry
+# Import the singleton access function
+from core.tools.registry_access import get_registry, reset_registry
 
 
 class TestWebSearchTool(unittest.TestCase):
     def setUp(self):
         """Set up the tool registry for testing."""
-        self.registry = ToolRegistry()
+        # Reset the registry before each test
+        reset_registry()
+        # Get the singleton instance
+        self.registry = get_registry()
 
-    @patch("tools.web_search_tool.OpenAI")
-    def test_web_search(self, mock_openai):
+    @patch("core.tools.web_search.WebSearchTool.search_internet")
+    def test_web_search(self, mock_search_internet):
         """Test the web search tool."""
         mock_client = MagicMock()
-        mock_openai.return_value = mock_client
+        mock_search_internet.return_value = mock_client
         
         mock_response = "Today, scientists announced a breakthrough in renewable energy technology, " \
                        "celebrating a major success in the fight against climate change."

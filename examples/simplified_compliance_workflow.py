@@ -482,8 +482,14 @@ def main():
     workflow.add_task(task6)
 
     # Create agent with workflow
-    agent = Agent(agent_id="compliance_agent", name="Compliance Analysis Agent")
-    
+    registry = get_registry() # Get the singleton registry
+    agent = Agent(
+        agent_id="compliance_agent", 
+        name="Compliance Analysis Agent",
+        tool_registry=registry # Pass the registry
+    )
+    agent.load_workflow(workflow)
+
     # Check for DirectHandlerTask dependencies attribute issues
     for task_id, task in workflow.tasks.items():
         if hasattr(task, 'is_direct_handler') and task.is_direct_handler:
@@ -493,10 +499,7 @@ def main():
                 # Remove the dependencies attribute to prevent errors
                 delattr(task, 'dependencies')
     
-    agent.load_workflow(workflow)
-
-    # Run the agent
-    logger.info("Running simplified compliance workflow...")
+    logger.info("\nExecuting compliance check workflow...")
     result = agent.run()
 
     # Display results

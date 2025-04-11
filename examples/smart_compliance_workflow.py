@@ -29,6 +29,9 @@ from core.tools.registry_access import (
     get_registry, register_tool, execute_tool, 
     tool_exists, get_available_tools
 )
+# Import the global services access function
+from core.services import get_services
+from core.llm.interface import LLMInterface  # Add import for LLMInterface
 
 # Configure logging
 logger = logging.getLogger("compliance_workflow")
@@ -199,6 +202,10 @@ def create_compliance_vector_store_if_needed() -> Optional[str]:
     Returns:
         The vector store ID if successful, None otherwise
     """
+    # Get the registry from the services container
+    services = get_services()
+    registry = services.tool_registry
+    
     vs_name = "Compliance Documents"
     compliance_vs_id = None
     upload_needed = False
@@ -312,8 +319,9 @@ def build_compliance_check_workflow(
     Returns:
         A Workflow object configured for compliance checking.
     """
-    # Create a reference to the registry to ensure task tools use the same registry
-    registry = ToolRegistry()
+    # Use the services container to get the registry
+    services = get_services()
+    registry = services.tool_registry
 
     # Register tools again here to ensure they're available
     try:
@@ -703,6 +711,9 @@ def main() -> None:
     """Run the compliance check workflow example."""
     logger.info("Starting Compliance Check Workflow Example (using LLM + FileSearch)")
 
+    # Initialize services container
+    services = get_services()
+    
     # Basic check for prerequisites
     if not os.getenv("OPENAI_API_KEY"):
         logger.error("OPENAI_API_KEY environment variable is required for LLM tasks.")
@@ -710,6 +721,9 @@ def main() -> None:
 
     # --- Initialize Tool Registry and Register Placeholder Tools ---
     try:
+        # Get the registry from services
+        registry = services.tool_registry
+        
         # Debug: Print all registered tools to check what's available
         logger.info(f"Tools in registry before adding: {get_available_tools()}")
 
@@ -764,7 +778,17 @@ def main() -> None:
                     delattr(task, 'dependencies')
 
         # Instantiate the agent
-        agent = Agent(agent_id="compliance_checker_agent_llm_v2", name="Compliance Checker Agent (LLM/VS)")
+        services = get_services()
+        # If we want a custom LLM interface, create and register it
+        llm_interface = LLMInterface()
+        services.register_llm_interface(llm_interface)
+        
+        agent = Agent(
+            agent_id="compliance_checker_agent_llm_v2", 
+            name="Compliance Checker Agent (LLM/VS)",
+            llm_interface=llm_interface
+            # Tool registry comes from services container automatically
+        )
         agent.load_workflow(workflow)
 
         logger.info("\nExecuting compliance check workflow...")

@@ -14,6 +14,8 @@ import sys
 import json
 from datetime import datetime
 from typing import Dict, Any
+import logging
+from dotenv import load_dotenv
 
 # Add parent directory to path to import framework modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -24,6 +26,8 @@ from core.llm.interface import LLMInterface
 from core.task import DirectHandlerTask, Task
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
+from core.tools.registry_access import get_registry, register_tool
+from core.services import get_services
 
 
 # Define DirectHandler functions for the workflow
@@ -200,9 +204,38 @@ def write_file_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
+# Register the report handlers with proper DI
+def setup_example():
+    """Set up services and register tools for the example."""
+    # Get the services container
+    services = get_services()
+    
+    # Get the registry from services
+    registry = services.tool_registry
+    
+    # Register tools
+    if not registry.tool_exists("generate_data"):
+        registry.register_tool("generate_data", generate_data_handler)
+    if not registry.tool_exists("process_data"):
+        registry.register_tool("process_data", process_data_handler)
+    if not registry.tool_exists("generate_report"):
+        registry.register_tool("generate_report", generate_report_handler)
+    if not registry.tool_exists("write_file"):
+        registry.register_tool("write_file", write_file_handler)
+        
+    # Create and register an LLM interface if needed
+    llm_interface = LLMInterface()
+    services.register_llm_interface(llm_interface)
+    
+    return services
+
+
 def main():
     """Run the example workflow."""
     print("=== Starting Simple DirectHandlerTask Example ===")
+    
+    # Set up services
+    services = setup_example()
     
     # Create workflow
     workflow = Workflow(
@@ -269,16 +302,14 @@ def main():
     
     # Create an agent and run the workflow
     print("\nInitializing Agent...")
-    registry = ToolRegistry()
-    llm_interface = LLMInterface()
-    
     agent = Agent(
         agent_id="direct_handler_agent",
-        name="DirectHandlerTask Example Agent",
-        llm_interface=llm_interface,
-        tool_registry=registry
+        name="Direct Handler Example Agent",
+        llm_interface=services.get_llm_interface(),
+        # Tool registry is now automatically provided via the services container
     )
     agent.load_workflow(workflow)
+    print("Agent initialized, running workflow...")
     
     # Run the workflow
     print("\nExecuting workflow...")
@@ -323,4 +354,11 @@ def main():
 
 
 if __name__ == "__main__":
+    # --- Setup ---
+    logging.basicConfig(level=logging.INFO)
+    load_dotenv()
+
+    # Get the singleton registry
+    registry = get_registry()
+
     main() 

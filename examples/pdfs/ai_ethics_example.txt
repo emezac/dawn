@@ -1,0 +1,22 @@
+# Principles of AI Ethics
+
+## Fairness
+AI systems should treat all people fairly and not discriminate based on race, gender, age, or other protected characteristics. Algorithmic fairness requires careful consideration of biases in training data and model design.
+
+## Transparency
+AI systems should operate in a transparent manner. Users should be informed when they are interacting with AI, and organizations should be able to explain how AI decisions are made.
+
+## Privacy and Security
+AI systems should respect user privacy and be secure. Personal data should be protected, and consent should be obtained for data collection and use in AI training and operation.
+
+## Human Oversight
+AI systems should be designed to enable human oversight and control. Critical decisions should always include human review and the ability to override automated decisions.
+
+## Accountability
+Organizations developing and deploying AI should be accountable for their systems' impacts. Clear mechanisms for addressing concerns and remedying any harm caused by AI should be established.
+
+## Reliability and Safety
+AI systems should operate reliably and safely. Rigorous testing and ongoing monitoring are essential to prevent unintended consequences and ensure the system functions as designed.
+
+## Social and Environmental Well-being
+The broader societal and environmental impacts of AI should be considered throughout the system's lifecycle. AI should be developed to benefit humanity and minimize negative impacts on society and the environment. 
