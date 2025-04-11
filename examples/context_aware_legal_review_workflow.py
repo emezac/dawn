@@ -39,6 +39,10 @@ from core.agent import Agent
 from core.task import Task, DirectHandlerTask
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
+from core.tools.registry_access import (
+    get_registry, register_tool, execute_tool, 
+    tool_exists, get_available_tools
+)
 
 load_dotenv()
 
@@ -239,13 +243,10 @@ def save_to_ltm_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
             # Continue to try the registry
         
         # Try to use the registry's save_to_ltm if available
-        registry = ToolRegistry()
-        
-        # Check if save_to_ltm is available in the registry
-        if "save_to_ltm" in registry.tools:
+        if tool_exists("save_to_ltm"):
             # Use the registered tool
             print("Using registered save_to_ltm tool")
-            result = registry.execute_tool("save_to_ltm", {
+            result = execute_tool("save_to_ltm", {
                 "vector_store_id": vector_store_id,
                 "text_content": text_content
             })
@@ -402,9 +403,8 @@ def search_web_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
             "error_type": "MissingParameter"
         }
     
-    # Use the ToolRegistry to execute the web_search tool
-    registry = ToolRegistry()
-    result = registry.execute_tool("web_search", {
+    # Use the standardized registry access to execute the web_search tool
+    result = execute_tool("web_search", {
         "query": query,
         "context_size": context_size
     })
@@ -493,9 +493,7 @@ def create_vector_stores_if_needed():
     Create vector stores for legal guidelines and agent LTM if they don't exist.
     Returns a tuple of (legal_guidelines_vs_id, agent_ltm_vs_id).
     """
-    registry = ToolRegistry()
-
-    list_result = registry.execute_tool("list_vector_stores", {})
+    list_result = execute_tool("list_vector_stores", {})
     if not list_result["success"]:
         print("Failed to list vector stores:", list_result["error"])
         return None, None
@@ -513,7 +511,7 @@ def create_vector_stores_if_needed():
             print(f"Found existing agent LTM vector store: {ltm_vs_id}")
 
     if not legal_vs_id:
-        create_result = registry.execute_tool("create_vector_store", {"name": "Internal Legal Guidelines"})
+        create_result = execute_tool("create_vector_store", {"name": "Internal Legal Guidelines"})
         if not create_result["success"]:
             print("Failed to create legal guidelines vector store:", create_result["error"])
             return None, None
@@ -553,7 +551,7 @@ def create_vector_stores_if_needed():
             )
             legal_doc_path = temp_file.name
 
-        upload_result = registry.execute_tool(
+        upload_result = execute_tool(
             "upload_file_to_vector_store",
             {"vector_store_id": legal_vs_id, "file_path": legal_doc_path, "purpose": "assistants"},
         )
@@ -565,7 +563,7 @@ def create_vector_stores_if_needed():
         os.remove(legal_doc_path)
 
     if not ltm_vs_id:
-        create_result = registry.execute_tool("create_vector_store", {"name": "Agent LTM"})
+        create_result = execute_tool("create_vector_store", {"name": "Agent LTM"})
         if not create_result["success"]:
             print("Failed to create agent LTM vector store:", create_result["error"])
             return legal_vs_id, None
@@ -945,8 +943,7 @@ def main():
         agent.load_workflow(workflow)
         
         # Register our custom save_to_ltm handler if needed
-        registry = ToolRegistry()
-        if "save_to_ltm" not in registry.tools:
+        if not tool_exists("save_to_ltm"):
             # Define a dummy function for save_to_ltm that calls our handler
             def dummy_save_to_ltm(input_data):
                 print("Using custom save_to_ltm implementation from registered tool")
@@ -966,10 +963,10 @@ def main():
                     }
             
             print("Registering custom save_to_ltm tool")
-            registry.register_tool("save_to_ltm", dummy_save_to_ltm)
+            success = register_tool("save_to_ltm", dummy_save_to_ltm)
             
             # Verify registration was successful
-            if "save_to_ltm" in registry.tools:
+            if success and tool_exists("save_to_ltm"):
                 print("Successfully registered save_to_ltm tool")
             else:
                 print("WARNING: Failed to register save_to_ltm tool!")

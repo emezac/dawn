@@ -25,6 +25,10 @@ from core.engine import WorkflowEngine
 from core.task import DirectHandlerTask, Task
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
+from core.tools.registry_access import (
+    get_registry, register_tool, execute_tool, 
+    tool_exists, get_available_tools
+)
 
 # Configure logging
 logger = logging.getLogger("compliance_workflow")
@@ -187,13 +191,10 @@ def extract_task_output(task_output, field_path=None):
     return current
 
 
-def create_compliance_vector_store_if_needed(registry: ToolRegistry) -> Optional[str]:
+def create_compliance_vector_store_if_needed() -> Optional[str]:
     """
     Creates a Vector Store for compliance documents if it doesn't exist
     and uploads sample compliance data.
-
-    Args:
-        registry: The ToolRegistry instance to use for tool operations
 
     Returns:
         The vector store ID if successful, None otherwise
@@ -206,7 +207,7 @@ def create_compliance_vector_store_if_needed(registry: ToolRegistry) -> Optional
     # List existing stores to find it
     try:
         logger.info("Checking for existing Vector Stores...")
-        list_result = registry.execute_tool("list_vector_stores", {})
+        list_result = execute_tool("list_vector_stores", {})
 
         if list_result and list_result.get("success"):
             for store in list_result.get("result", []):
@@ -224,7 +225,7 @@ def create_compliance_vector_store_if_needed(registry: ToolRegistry) -> Optional
         upload_needed = True  # Need to upload if newly created
         try:
             logger.info(f"Creating new vector store: {vs_name}")
-            create_result = registry.execute_tool("create_vector_store", {"name": vs_name})
+            create_result = execute_tool("create_vector_store", {"name": vs_name})
 
             if create_result and create_result.get("success"):
                 compliance_vs_id = create_result.get("result")
@@ -273,7 +274,7 @@ def create_compliance_vector_store_if_needed(registry: ToolRegistry) -> Optional
                 raise FileNotFoundError(f"Temporary file not found at {temp_file_path}")
 
             logger.info(f"Attempting upload from path: {temp_file_path}")
-            upload_result = registry.execute_tool(
+            upload_result = execute_tool(
                 "upload_file_to_vector_store", {"vector_store_id": compliance_vs_id, "file_path": temp_file_path}
             )
 
@@ -708,30 +709,27 @@ def main() -> None:
         sys.exit(1)  # Exit with error code
 
     # --- Initialize Tool Registry and Register Placeholder Tools ---
-    registry = None
     try:
-        registry = ToolRegistry()  # Assumes singleton or gets the instance
-
         # Debug: Print all registered tools to check what's available
-        logger.info(f"Tools in registry before adding: {list(registry.tools.keys())}")
+        logger.info(f"Tools in registry before adding: {get_available_tools()}")
 
         # Register tools with proper check if they exist
         for tool_name, handler_func in [
             ("log_alert", log_alert_handler),
             ("log_info", log_info_handler)
         ]:
-            if tool_name not in registry.tools:
-                registry.register_tool(tool_name, handler_func)
+            if not tool_exists(tool_name):
+                register_tool(tool_name, handler_func)
                 logger.info(f"Registered {tool_name} tool.")
             else:
                 logger.info(f"Tool {tool_name} already registered, skipping.")
 
         # Debug: Print all registered tools after adding ours
-        logger.info(f"Tools in registry after adding: {list(registry.tools.keys())}")
+        logger.info(f"Tools in registry after adding: {get_available_tools()}")
 
         # Verify necessary VS tools are registered
         required_vs_tools = ["list_vector_stores", "create_vector_store", "upload_file_to_vector_store"]
-        missing_tools = [tool for tool in required_vs_tools if tool not in list(registry.tools.keys())]
+        missing_tools = [tool for tool in required_vs_tools if not tool_exists(tool)]
 
         if missing_tools:
             logger.error(f"Missing required Vector Store tools in registry: {missing_tools}")
@@ -743,7 +741,7 @@ def main() -> None:
         sys.exit(1)  # Exit with error code
 
     # --- Setup Compliance Vector Store ---
-    compliance_vs_id = create_compliance_vector_store_if_needed(registry)
+    compliance_vs_id = create_compliance_vector_store_if_needed()
     if not compliance_vs_id:
         logger.error("Failed to ensure compliance vector store is ready. Exiting.")
         sys.exit(1)  # Exit with error code

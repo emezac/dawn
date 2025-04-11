@@ -16,6 +16,10 @@ from core.agent import Agent
 from core.task import Task, DirectHandlerTask
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
+from core.tools.registry_access import (
+    get_registry, register_tool, execute_tool, 
+    tool_exists, get_available_tools
+)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -390,21 +394,18 @@ def main():
     compliance with relevant regulations.
     """  # noqa: D202
 
-    # Create tool registry and register tools
-    registry = ToolRegistry()
+    # Register tools using standardized registry access
+    if not tool_exists("log_alert"):
+        register_tool("log_alert", log_alert_handler)
 
-    # Register tools using direct tool registry access
-    if "log_alert" not in list(registry.tools.keys()):
-        registry.register_tool("log_alert", log_alert_handler)
+    if not tool_exists("extract_compliance_topics"):
+        register_tool("extract_compliance_topics", extract_compliance_topics_handler)
 
-    if "extract_compliance_topics" not in list(registry.tools.keys()):
-        registry.register_tool("extract_compliance_topics", extract_compliance_topics_handler)
+    if not tool_exists("evaluate_compliance_report"):
+        register_tool("evaluate_compliance_report", evaluate_compliance_report_handler)
 
-    if "evaluate_compliance_report" not in list(registry.tools.keys()):
-        registry.register_tool("evaluate_compliance_report", evaluate_compliance_report_handler)
-
-    if "generate_compliance_report" not in list(registry.tools.keys()):
-        registry.register_tool("generate_compliance_report", generate_compliance_report_handler)
+    if not tool_exists("generate_compliance_report"):
+        register_tool("generate_compliance_report", generate_compliance_report_handler)
 
     # Create and configure the workflow
     workflow = Workflow(workflow_id="compliance_workflow", name="Simplified Compliance Workflow")
