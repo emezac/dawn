@@ -4,21 +4,74 @@ Simplified Compliance Workflow Example
 
 This example demonstrates a compliance document analysis workflow
 using wrapper functions for framework compatibility.
-"""
+"""  # noqa: D202
 
 import logging
 import os
 import tempfile
+import json
 from typing import Any, Dict, List, Optional
 
 from core.agent import Agent
-from core.task import Task
+from core.task import Task, DirectHandlerTask
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Utility function for parsing structured task outputs
+def extract_task_output(task_output, field_path=None):
+    """
+    Extract data from task output using a field path.
+    
+    Args:
+        task_output: The task output data to extract from
+        field_path: Optional dot-notation path to extract (e.g., "result.summary")
+        
+    Returns:
+        The extracted data or the original output if no path is provided
+    """
+    if not task_output:
+        return None
+        
+    # If no specific field path is requested, try to get the most useful representation
+    if not field_path:
+        # For LLM tasks (which typically have a response field)
+        if isinstance(task_output, dict) and "response" in task_output:
+            # Try to parse it as JSON if it looks like JSON
+            response = task_output.get("response", "")
+            if response and isinstance(response, str) and (response.strip().startswith("{") or response.strip().startswith("[")):
+                try:
+                    return json.loads(response)
+                except json.JSONDecodeError:
+                    return response
+            return response
+        # For tool tasks (which typically have a result field)
+        elif isinstance(task_output, dict) and "result" in task_output:
+            return task_output.get("result")
+        # Otherwise, just return the output as is
+        return task_output
+    
+    # If a specific field path is provided, navigate the object structure
+    current = task_output
+    for field in field_path.split("."):
+        if isinstance(current, dict) and field in current:
+            current = current[field]
+        else:
+            # If the field is not found, try to parse JSON if this is a string
+            if isinstance(current, str) and (current.strip().startswith("{") or response.strip().startswith("[")):
+                try:
+                    parsed = json.loads(current)
+                    if isinstance(parsed, dict) and field in parsed:
+                        current = parsed[field]
+                        continue
+                except json.JSONDecodeError:
+                    pass
+            # If we couldn't find or parse the field, return None
+            return None
+    return current
 
 
 # Compatibility wrapper functions
@@ -90,8 +143,11 @@ def get_task_history(workflow):
 
 
 # Custom tool handler definitions
-def log_alert_handler(message: str, level: str = "INFO") -> Dict[str, Any]:
+def log_alert_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Log an alert message at the specified level."""
+    message = input_data.get("message", "No message provided")
+    level = input_data.get("level", "INFO").upper()
+    
     log_levels = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -99,30 +155,140 @@ def log_alert_handler(message: str, level: str = "INFO") -> Dict[str, Any]:
         "ERROR": logging.ERROR,
         "CRITICAL": logging.CRITICAL,
     }
-    log_level = log_levels.get(level.upper(), logging.INFO)
+    log_level = log_levels.get(level, logging.INFO)
     logger.log(log_level, f"ALERT: {message}")
-    return {"status": "success", "message": f"Alert logged: {message}"}
+    
+    return {
+        "success": True,
+        "result": f"Alert logged: {message}",
+        "status": "success" 
+    }
 
 
-def extract_compliance_topics_handler(document_content: str) -> Dict[str, Any]:
+def extract_compliance_topics_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Extract key compliance topics from document content."""
+    document_content = input_data.get("document_content", "")
+    
+    if not document_content:
+        return {
+            "success": False,
+            "error": "Missing document content",
+            "result": {
+                "topics": [],
+                "summary": "No document content provided"
+            }
+        }
+    
     # This would typically use an LLM or other extraction method
     # For simplicity, we're just simulating the extraction
     logger.info("Extracting compliance topics from document")
 
-    # Simulate extraction results
-    topics = ["Data Privacy", "Security Requirements", "Regulatory Compliance", "Third-party Risk"]
+    # Simulate extraction results based on document content
+    topics = []
+    if "data privacy" in document_content.lower():
+        topics.append("Data Privacy")
+    if "security" in document_content.lower():
+        topics.append("Security Requirements")
+    if "regulatory" in document_content.lower():
+        topics.append("Regulatory Compliance")
+    if "third-party" in document_content.lower():
+        topics.append("Third-party Risk")
+    
+    # Add default topics if none were found
+    if not topics:
+        topics = ["Data Privacy", "Security Requirements", "Regulatory Compliance", "Third-party Risk"]
 
     return {
-        "status": "success",
-        "topics": topics,
-        "summary": "This document covers several compliance areas including data privacy and security.",
+        "success": True,
+        "result": {
+            "topics": topics,
+            "summary": "This document covers several compliance areas including data privacy and security."
+        }
     }
 
 
-def evaluate_compliance_report_handler(topics: List[str], document_content: str) -> Dict[str, Any]:
+def parse_json_output(input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse JSON output from LLM task or structured data."""
+    llm_output = input_data.get("llm_output", "{}")
+    
+    # If the input is already a dictionary with result field, extract and return it
+    if isinstance(llm_output, dict) and "result" in llm_output:
+        return {
+            "success": True,
+            "result": llm_output.get("result", {}),
+            "error": None
+        }
+    
+    # If the input is a dictionary with response field (LLM output), extract it
+    if isinstance(llm_output, dict) and "response" in llm_output:
+        llm_output = llm_output.get("response", "{}")
+            
+    # Handle string output
+    if isinstance(llm_output, str):
+        try:
+            # Try to parse the JSON
+            result = json.loads(llm_output)
+            return {
+                "success": True,
+                "result": result,
+                "error": None
+            }
+        except json.JSONDecodeError as e:
+            # If parsing fails, try to extract just the JSON part
+            # Look for starting { and ending }
+            start_idx = llm_output.find('{')
+            end_idx = llm_output.rfind('}')
+            
+            if start_idx >= 0 and end_idx > start_idx:
+                # Extract what looks like JSON
+                json_str = llm_output[start_idx:end_idx+1]
+                try:
+                    result = json.loads(json_str)
+                    return {
+                        "success": True,
+                        "result": result,
+                        "error": None
+                    }
+                except json.JSONDecodeError:
+                    pass
+            
+            # If we still can't parse it, return default structure with error
+            return {
+                "success": False,
+                "result": {
+                    "topics": [],
+                    "summary": "Failed to parse output"
+                },
+                "error": f"Failed to parse JSON: {str(e)}"
+            }
+    
+    # If the input was neither a string nor a dict with expected fields
+    return {
+        "success": False,
+        "result": {
+            "topics": [],
+            "summary": "Unexpected input format"
+        },
+        "error": "Input was not in expected format"
+    }
+
+
+def evaluate_compliance_report_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Evaluate compliance report and determine if action is needed."""
+    topics = input_data.get("topics", [])
+    document_content = input_data.get("document_content", "")
+    
     logger.info(f"Evaluating compliance topics: {topics}")
+
+    # Handle case where topics is not a list
+    if not isinstance(topics, list):
+        logger.warning(f"Topics not in expected format. Got: {type(topics)}")
+        # Try to extract topics if it's a dictionary
+        if isinstance(topics, dict) and "topics" in topics:
+            topics = topics.get("topics", [])
+        else:
+            # Use empty list as fallback
+            topics = []
 
     # Simulate evaluation logic
     high_risk_topics = ["Data Privacy", "Security Requirements"]
@@ -131,31 +297,56 @@ def evaluate_compliance_report_handler(topics: List[str], document_content: str)
     action_needed = risk_score >= 1
 
     return {
-        "status": "success",
-        "Action": "ACTION_REQUIRED" if action_needed else "NO_ACTION",
-        "RiskScore": risk_score,
-        "Explanation": (
-            "High risk compliance topics detected." if action_needed else "No high risk compliance topics detected."
-        ),
+        "success": True,
+        "result": {
+            "Action": "ACTION_REQUIRED" if action_needed else "NO_ACTION",
+            "RiskScore": risk_score,
+            "Explanation": (
+                "High risk compliance topics detected." if action_needed else "No high risk compliance topics detected."
+            )
+        }
     }
 
 
-def generate_compliance_report_handler(
-    topics: List[str], evaluation_result: Dict[str, Any], document_content: str
-) -> Dict[str, Any]:
+def generate_compliance_report_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Generate a compliance report based on extracted topics and evaluation."""
+    topics = input_data.get("topics", [])
+    evaluation_result = input_data.get("evaluation_result", {})
+    document_content = input_data.get("document_content", "")
+    
+    # Handle case where topics is not a list
+    if not isinstance(topics, list):
+        logger.warning(f"Topics not in expected format. Got: {type(topics)}")
+        # Try to extract topics if it's a dictionary
+        if isinstance(topics, dict) and "topics" in topics:
+            topics = topics.get("topics", [])
+        else:
+            # Use empty list as fallback
+            topics = []
+    
+    # Extract evaluation details with fallbacks
+    if isinstance(evaluation_result, dict):
+        action = evaluation_result.get("Action", "NO_ACTION")
+        risk_score = evaluation_result.get("RiskScore", 0)
+        explanation = evaluation_result.get("Explanation", "No explanation provided")
+    else:
+        # Default values if evaluation_result is not a dictionary
+        action = "NO_ACTION" 
+        risk_score = 0
+        explanation = "No evaluation data provided"
+
     logger.info("Generating compliance report")
 
     report_content = f"""
     COMPLIANCE ANALYSIS REPORT
     
-    Topics Identified: {', '.join(topics)}
-    Risk Assessment: {evaluation_result['Explanation']}
-    Risk Score: {evaluation_result['RiskScore']}
-    Action Required: {evaluation_result['Action'] == 'ACTION_REQUIRED'}
+    Topics Identified: {', '.join(topics) if topics else 'None identified'}
+    Risk Assessment: {explanation}
+    Risk Score: {risk_score}
+    Action Required: {action == 'ACTION_REQUIRED'}
     
     Recommendations:
-    1. Review the document sections related to {topics[0]}
+    1. Review the document sections related to {topics[0] if topics else 'compliance'}
     2. Update compliance documentation as needed
     3. Consider additional controls for high-risk areas
     """
@@ -168,10 +359,25 @@ def generate_compliance_report_handler(
         with open(report_path, "w") as file:
             file.write(report_content)
 
-        return {"status": "success", "report_path": report_path, "summary": "Compliance report generated successfully."}
+        return {
+            "success": True, 
+            "result": {
+                "report_path": report_path, 
+                "summary": "Compliance report generated successfully.",
+                "content": report_content
+            }
+        }
     except Exception as e:
         logger.error(f"Failed to write report: {str(e)}")
-        return {"status": "error", "error": f"Failed to generate report: {str(e)}"}
+        return {
+            "success": False,
+            "error": f"Failed to generate report: {str(e)}",
+            "result": {
+                "report_path": None,
+                "summary": f"Error: {str(e)}",
+                "content": report_content
+            }
+        }
 
 
 def main():
@@ -182,7 +388,7 @@ def main():
     security requirements, and regulatory compliance. The document outlines
     procedures for handling customer data, security protocols, and ensuring
     compliance with relevant regulations.
-    """
+    """  # noqa: D202
 
     # Create tool registry and register tools
     registry = ToolRegistry()
@@ -200,88 +406,154 @@ def main():
     if "generate_compliance_report" not in list(registry.tools.keys()):
         registry.register_tool("generate_compliance_report", generate_compliance_report_handler)
 
-    # Create workflow
-    workflow = Workflow(registry=registry)
+    # Create and configure the workflow
+    workflow = Workflow(workflow_id="compliance_workflow", name="Simplified Compliance Workflow")
 
-    # Task 1: Extract compliance topics
-    task_1 = create_task(
-        task_id="task_1_extract_topics",
-        name="Extract Contract Topics",
-        is_llm_task=False,
-        tool_name="extract_compliance_topics",
+    # Task 1: Extract Compliance Topics
+    task1 = DirectHandlerTask(
+        task_id="extract_topics_task",
+        name="Extract Compliance Topics",
+        handler=extract_compliance_topics_handler,
         input_data={"document_content": document_content},
-        next_task_id_on_success="task_2_evaluate_report",
+        next_task_id_on_success="parse_topics_task",
     )
-    workflow.add_task(task_1)
-
-    # Task 2: Evaluate compliance report
-    task_2 = create_task(
-        task_id="task_2_evaluate_report",
-        name="Evaluate Compliance",
-        is_llm_task=False,
-        tool_name="evaluate_compliance_report",
-        input_data={"topics": "${task_1_extract_topics.output_data[topics]}", "document_content": document_content},
-        next_task_id_on_success="task_3_generate_report",
-        dependencies=["task_1_extract_topics"],
+    workflow.add_task(task1)
+    
+    # Task 2: Parse Topics Output
+    task2 = DirectHandlerTask(
+        task_id="parse_topics_task",
+        name="Parse Topics Output",
+        handler=parse_json_output,
+        input_data={"llm_output": "${extract_topics_task.output_data}"},
+        next_task_id_on_success="evaluate_compliance_task",
     )
-    workflow.add_task(task_2)
+    workflow.add_task(task2)
 
-    # Create string condition instead of dictionary
-    condition_str = "output_data.get('Action') == 'ACTION_REQUIRED'"
-
-    # Task 3: Generate compliance report
-    task_3 = create_task(
-        task_id="task_3_generate_report",
-        name="Generate Compliance Report",
-        is_llm_task=False,
-        tool_name="generate_compliance_report",
+    # Task 3: Evaluate Compliance Report
+    task3 = DirectHandlerTask(
+        task_id="evaluate_compliance_task",
+        name="Evaluate Compliance Report",
+        handler=evaluate_compliance_report_handler,
         input_data={
-            "topics": "${task_1_extract_topics.output_data[topics]}",
-            "evaluation_result": "${task_2_evaluate_report.output_data}",
+            "topics": "${parse_topics_task.output_data.result.topics | []}",
             "document_content": document_content,
         },
-        next_task_id_on_success="task_4_log_result",
-        condition=condition_str,
-        dependencies=["task_1_extract_topics", "task_2_evaluate_report"],
+        next_task_id_on_success="parse_evaluation_task",
     )
-    workflow.add_task(task_3)
+    workflow.add_task(task3)
+    
+    # Task 4: Parse Evaluation Output
+    task4 = DirectHandlerTask(
+        task_id="parse_evaluation_task",
+        name="Parse Evaluation Output",
+        handler=parse_json_output,
+        input_data={"llm_output": "${evaluate_compliance_task.output_data}"},
+        next_task_id_on_success="generate_report_task",
+    )
+    workflow.add_task(task4)
 
-    # Task 4: Log result
-    task_4 = create_task(
-        task_id="task_4_log_result",
-        name="Log Compliance Result",
-        is_llm_task=False,
-        tool_name="log_alert",
+    # Task 5: Generate Compliance Report
+    task5 = DirectHandlerTask(
+        task_id="generate_report_task",
+        name="Generate Compliance Report",
+        handler=generate_compliance_report_handler,
         input_data={
-            "message": "Compliance report generated: ${task_3_generate_report.output_data[report_path]}",
-            "level": "INFO",
+            "topics": "${parse_topics_task.output_data.result.topics | []}",
+            "evaluation_result": "${parse_evaluation_task.output_data.result | {}}",
+            "document_content": document_content,
         },
-        dependencies=["task_3_generate_report"],
+        next_task_id_on_success="log_alert_task",
     )
-    workflow.add_task(task_4)
+    workflow.add_task(task5)
 
-    # Create agent
-    agent = Agent(workflow=workflow)
+    # Task 6: Log Alert (if needed)
+    task6 = DirectHandlerTask(
+        task_id="log_alert_task",
+        name="Log Compliance Alert",
+        handler=log_alert_handler,
+        input_data={
+            "message": "Compliance alert: Action required for document with risk score ${parse_evaluation_task.output_data.result.RiskScore | 0}",
+            "level": "CRITICAL",
+        },
+        condition="output_data.get('result', {}).get('Action', 'NO_ACTION') == 'ACTION_REQUIRED'",
+        next_task_id_on_success=None,  # End workflow
+    )
+    workflow.add_task(task6)
 
-    # Run agent with initial input
-    result = run_agent_with_input(agent, {"document_id": "DOC123"})
-
-    # Get execution history
-    history = get_task_history(workflow)
-    logger.info(f"Workflow execution history: {history}")
-
-    # Clean up any temporary files
+    # Create agent with workflow
+    agent = Agent(agent_id="compliance_agent", name="Compliance Analysis Agent")
+    
+    # Check for DirectHandlerTask dependencies attribute issues
     for task_id, task in workflow.tasks.items():
-        if task.output_data and isinstance(task.output_data, dict) and "report_path" in task.output_data:
-            report_path = task.output_data["report_path"]
-            try:
-                if os.path.exists(report_path):
-                    os.unlink(report_path)
-                    logger.info(f"Deleted temporary file: {report_path}")
-            except Exception as e:
-                logger.warning(f"Failed to delete temporary file {report_path}: {e}")
+        if hasattr(task, 'is_direct_handler') and task.is_direct_handler:
+            # Verify no 'dependencies' attribute is mistakenly set
+            if hasattr(task, 'dependencies'):
+                logger.warning(f"Task {task_id} is a DirectHandlerTask but has a 'dependencies' attribute. This is unsupported and will be removed.")
+                # Remove the dependencies attribute to prevent errors
+                delattr(task, 'dependencies')
+    
+    agent.load_workflow(workflow)
 
-    return result
+    # Run the agent
+    logger.info("Running simplified compliance workflow...")
+    result = agent.run()
+
+    # Display results
+    if result:
+        logger.info("Workflow completed successfully")
+        
+        # Get task history
+        history = get_task_history(workflow)
+        logger.info("Task execution summary:")
+        for task_data in history:
+            task_id = task_data["task_id"]
+            status = task_data["status"]
+            task = workflow.tasks.get(task_id)
+            task_name = task.name if task else task_id
+            logger.info(f"  - {task_name} ({task_id}): {status}")
+            
+            if status == "completed":
+                # Use extract_task_output for consistent data access
+                output = extract_task_output(task_data["output_data"])
+                if output:
+                    if isinstance(output, dict):
+                        # Truncate dictionary representation
+                        logger.info(f"    Output: {str(output)[:100]}...")
+                    else:
+                        # Truncate string representation
+                        logger.info(f"    Output: {str(output)[:100]}...")
+        
+        # Display final report
+        report_task = workflow.tasks.get("generate_report_task")
+        if report_task and report_task.status == "completed":
+            report_data = extract_task_output(report_task.output_data, "result")
+            if report_data and "content" in report_data:
+                logger.info("\nFinal Report:")
+                logger.info(report_data["content"])
+            elif report_data and "report_path" in report_data:
+                try:
+                    with open(report_data["report_path"], "r") as f:
+                        logger.info("\nFinal Report:")
+                        logger.info(f.read())
+                except Exception as e:
+                    logger.error(f"Failed to read report file: {e}")
+    else:
+        logger.error("Workflow failed")
+        
+        # Find failed tasks
+        failed_tasks = []
+        for task_id, task in workflow.tasks.items():
+            if task.status == "failed":
+                failed_tasks.append(task_id)
+                # Get error information
+                if hasattr(task, "output_data") and task.output_data:
+                    error_msg = task.output_data.get("error", "Unknown error")
+                    logger.error(f"Task {task_id} failed with error: {error_msg}")
+        
+        if failed_tasks:
+            logger.error(f"Failed tasks: {', '.join(failed_tasks)}")
+        else:
+            logger.error("No specific tasks marked as failed, but workflow did not complete successfully")
 
 
 if __name__ == "__main__":

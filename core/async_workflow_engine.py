@@ -36,7 +36,7 @@ class AsyncWorkflowEngine:
 
     This engine provides support for parallel tasks, conditional logic, and
     input/output variable substitution.
-    """
+    """  # noqa: D202
 
     def __init__(self, workflow: Workflow, llm_interface: LLMInterface, tool_registry: ToolRegistry):
         """Initialize the asynchronous workflow engine.
@@ -260,6 +260,24 @@ class AsyncWorkflowEngine:
             )
             return {"success": False, "error": f"Async execution wrapper error: {str(e)}"}
 
+    async def async_execute_direct_handler_task(self, task: Task) -> Dict[str, Any]:
+        """Executes a DirectHandlerTask by calling its execute method directly."""
+        processed_input = self.process_task_input(task)
+        
+        try:
+            # Execute the DirectHandlerTask's execute method
+            result = task.execute(processed_input)
+            
+            if result.get("success"):
+                return {"success": True, "result": result.get("result", result.get("response", {}))}
+            else:
+                error_msg = result.get("error", "Unknown DirectHandlerTask error")
+                log_error(f"DirectHandlerTask '{task.id}' failed: {error_msg}")
+                return {"success": False, "error": error_msg}
+        except Exception as e:
+            log_error(f"Exception during execution of DirectHandlerTask '{task.id}': {e}", exc_info=True)
+            return {"success": False, "error": f"DirectHandlerTask execution error: {str(e)}"}
+
     async def async_execute_task(self, task: Task) -> bool:
         """Executes a single task, handles retries, sets output and status."""
         log_task_start(task.id, task.name, self.workflow.id)  # Keep start log
@@ -267,7 +285,10 @@ class AsyncWorkflowEngine:
         execution_result: Dict[str, Any] = {}
 
         try:
-            if task.is_llm_task:
+            # Check if this is a DirectHandlerTask
+            if hasattr(task, "is_direct_handler") and task.is_direct_handler:
+                execution_result = await self.async_execute_direct_handler_task(task)
+            elif task.is_llm_task:
                 execution_result = await self.async_execute_llm_task(task)
             else:
                 execution_result = await self.async_execute_tool_task(task)

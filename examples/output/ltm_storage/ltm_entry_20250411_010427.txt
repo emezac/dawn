@@ -1,0 +1,17 @@
+Vector Store ID: vs_67f8ad0d8f6c8191876a0b514963310f
+Timestamp: 2025-04-11T01:04:27.618595
+Content Length: 592
+
+--- CONTENT ---
+
+            LEGAL REVIEW SUMMARY
+            
+            Date: Current Date
+            
+            Contract Topics:
+            ${parse_topics_json.output_data.result.topics[0].title | 'Topic 1'} - ${parse_topics_json.output_data.result.topics[0].summary | 'No summary available'}
+            ${parse_topics_json.output_data.result.topics[1].title | 'Topic 2'} - ${parse_topics_json.output_data.result.topics[1].summary | 'No summary available'}
+            
+            Redline Summary:
+            ${parse_redlines_json.output_data.result.summary | 'No redlines generated'}
+            

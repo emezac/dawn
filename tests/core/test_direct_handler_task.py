@@ -97,7 +97,7 @@ class TestDirectHandlerTask(unittest.TestCase):
         # Validate the result
         self.assertFalse(result.get("success"))
         self.assertIn("Test exception", result.get("error", ""))
-        self.assertEqual(result.get("exception_type"), "ValueError")
+        self.assertEqual(result.get("error_type"), "ValueError")
         self.assertIn("traceback", result)
 
     def test_execute_non_dict_result(self):

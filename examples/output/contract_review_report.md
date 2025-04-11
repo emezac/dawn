@@ -1,19 +1,22 @@
-# Contract Review Report
+# Legal Contract Review Report
 
-```
+## Contract Summary
 
 CONSULTING AGREEMENT
 
 This Consulting Agreement (the "Agreement") is made and entered into as of [DATE], by and between XYZ Corp., a Delaware corporation ("Company"), and ABC Consulting LLC, a California limited liability company ("Consultant").
 
-1. SERVICES. Consultant will provide consulting services to the Company as described in Exhibit A (the "Services").
+1. SERVICES. Consultant will provide consulting serv...
 
-2. COMPENSATION. Company shall pay Consultant $150 per hour for Services performed. Consultant shall invoice Company monthly, and payme...
-```
+## Key Topics Identified
+${task_1_extract_topics.output_data.response}
 
-{'response': 'Results from file search'}
+## Redline Suggestions
+Results from file search
 
-*Internal Guidelines Citations included in redlines*
-*LTM Context Used: Yes*
+## Review Context
+- Internal guidelines available but not shown in report
+- Web updates available but not shown in report
 
-2025-04-10
+## Review Timestamp
+2025-04-11 00:03:38

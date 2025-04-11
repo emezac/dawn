@@ -8,6 +8,11 @@ The AI Agent Framework is designed to enhance the capabilities of AI agents, all
 - **Web Search Tool**: Updated to use the latest model version with improved performance and reliability.
 - **Visualization of Workflow Execution**: Generate visual representations of workflows to aid in understanding and debugging.
 - **Vector Store ID Validation**: Robust utilities for validating OpenAI Vector Store IDs with different validation levels.
+- **DirectHandlerTask Support:**
+  - Register and use handler functions directly in workflows without needing global tool registry.
+  - Improved task output and variable resolution for complex data structures.
+  - Support for both synchronous and asynchronous workflow engines.
+  - Enhanced debugging and error reporting for task execution.
 
 ## Usage
 
@@ -137,6 +142,12 @@ The AI Agent Framework is an open-source Python framework designed to simplify t
   - Create and manage OpenAI Vector Stores for efficient data storage and retrieval.
   - Utilities for validating vector store IDs with basic and strict validation options.
   - Integration with file uploads and text storage for comprehensive knowledge management.
+
+- **DirectHandlerTask Support:**
+  - Register and use handler functions directly in workflows without needing global tool registry.
+  - Improved task output and variable resolution for complex data structures.
+  - Support for both synchronous and asynchronous workflow engines.
+  - Enhanced debugging and error reporting for task execution.
 
 - **Observability:**
   - Logging and tracing to support debugging and workflow analysis.
