@@ -176,7 +176,7 @@ class Task:
     def to_dict(self) -> Dict[str, Any]:
         """Convert the task to a dictionary representation."""
         return {
-            "id": self.id,
+            "task_id": self.id,
             "name": self.name,
             "status": self.status,
             "input_data": self.input_data,
@@ -213,139 +213,170 @@ class Task:
 
 
 class DirectHandlerTask(Task):
-    """
-    A Task subclass that directly executes a handler function without using the tool registry.
-
-    This provides a way to integrate custom task handling directly into workflows without
-    needing to register tools in the global registry.
+    """A task that directly executes a handler function.
+    
+    DirectHandlerTask supports two modes of operation:
+    1. Direct handler function: Pass a Python function directly via the handler parameter
+    2. Registry-based handler: Pass a string name via handler_name parameter that will be looked up in HandlerRegistry
+    
+    At least one of handler or handler_name must be provided. If both are provided,
+    the direct handler function takes precedence.
+    
+    This task type allows for executing arbitrary Python functions without requiring
+    them to be registered as tools, making it useful for simple data transformations,
+    service calls, or other operations that don't need the full tool infrastructure.
     """  # noqa: D202
-
+    
     def __init__(
         self,
         task_id: str,
         name: str,
-        handler: Callable[[Dict[str, Any]], Dict[str, Any]],
+        handler_name: Optional[str] = None,
+        handler: Optional[Callable] = None,
         input_data: Optional[Dict[str, Any]] = None,
-        condition: Optional[str] = None,
+        max_retries: int = 0,
+        depends_on: Optional[List[str]] = None,
+        timeout: Optional[int] = None,
         next_task_id_on_success: Optional[str] = None,
         next_task_id_on_failure: Optional[str] = None,
-        max_retries: int = 0,
+        condition: Optional[str] = None,
         parallel: bool = False,
-        validate_input: bool = False,
-        validate_output: bool = False,
+        **kwargs
     ):
-        """
-        Initialize a new DirectHandlerTask.
-
+        """Initialize a DirectHandlerTask.
+        
         Args:
             task_id: Unique identifier for the task
-            name: Human-readable name for the task
-            handler: Function that will be called with the task's input_data
-            input_data: Initial input data for the task
-            condition: Optional condition for task execution
-            next_task_id_on_success: ID of the next task to execute on success
-            next_task_id_on_failure: ID of the next task to execute on failure
-            max_retries: Maximum number of times to retry the task if it fails
+            name: Descriptive name for the task
+            handler_name: The name of the handler function to execute (required if handler not provided)
+            handler: The handler function to execute directly (if provided, takes precedence over handler_name)
+            input_data: Input data for the task
+            max_retries: Maximum number of retry attempts for the task
+            depends_on: IDs of tasks that must complete before this task (not used by Task class)
+            timeout: Maximum execution time in seconds (not used by Task class)
+            next_task_id_on_success: Task ID to execute if this task succeeds
+            next_task_id_on_failure: Task ID to execute if this task fails
+            condition: Optional condition to evaluate to determine next task
             parallel: Whether this task can be executed in parallel with others
-            validate_input: Whether to validate input against handler's type hints
-            validate_output: Whether to validate output against standard format
+            **kwargs: Additional task parameters
         """
-        # Initialize with Task constructor, using special tool_name format
+        # Ensure at least one of handler or handler_name is provided
+        if handler is None and handler_name is None:
+            raise ValueError("Either handler or handler_name must be provided")
+            
+        if input_data is None:
+            input_data = {}
+            
         super().__init__(
             task_id=task_id,
             name=name,
-            tool_name="__direct_handler__",  # Special placeholder value
             is_llm_task=False,
+            tool_name="N/A",  # Not using tool registry for direct handlers
             input_data=input_data,
-            condition=condition,
+            max_retries=max_retries,
             next_task_id_on_success=next_task_id_on_success,
             next_task_id_on_failure=next_task_id_on_failure,
-            max_retries=max_retries,
+            condition=condition,
             parallel=parallel,
-            validate_input=validate_input,
-            validate_output=validate_output,
+            **kwargs
         )
-
-        # Store the handler function
+        
+        # Store task-specific properties that aren't part of Task.__init__
         self.handler = handler
-        # Add a flag to identify this as a direct handler task
+        self.handler_name = handler_name
+        self.depends_on = depends_on or []
+        self.timeout = timeout
+        
+        # Set task_type after init for serialization
+        self.task_type = "direct_handler"
+        
+        # Flag to indicate this is a direct handler task
         self.is_direct_handler = True
+        
+        # If handler is provided directly, use its name as handler_name for to_dict()
+        if handler is not None and handler_name is None:
+            self.handler_name = handler.__name__
 
-    def execute(self, processed_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute the handler function directly with the provided input data.
-
+    def execute(self, processed_input: Optional[Dict[str, Any]] = None, workflow_variables=None, **kwargs):
+        """Execute the handler function with the task input.
+        
         Args:
             processed_input: Optional processed input data. If not provided,
                            the task's current input_data will be used.
-
+            workflow_variables: Variables from the workflow that can be referenced in input
+            **kwargs: Additional execution parameters
+            
         Returns:
             Dict with the result of the handler execution, containing at least:
             - success: bool indicating if the execution was successful
             - result/response: The output data of the handler
             - error: Error message if execution failed (optional)
         """
-        # Validate input if enabled
-        if self.validate_input:
-            from core.utils.data_validator import validate_task_input, format_validation_errors
-            
-            # Use provided processed input or fall back to task's input_data
-            input_to_use = processed_input if processed_input is not None else self.input_data
-            
-            errors = validate_task_input(self.handler, input_to_use)
-            if errors:
-                return {
-                    "success": False,
-                    "error": f"Input validation failed: {format_validation_errors(errors)}",
-                    "error_type": "ValidationError",
-                    "error_details": {"validation_errors": [str(e) for e in errors]}
-                }
+        # Determine which input to use (processed_input takes precedence over task.input_data)
+        input_to_use = processed_input if processed_input is not None else self.input_data
+        
+        # Apply variable resolution if workflow_variables are provided
+        if workflow_variables and not processed_input:
+            try:
+                from core.variable_resolver import resolve_variables
+                input_to_use = resolve_variables(input_to_use, workflow_variables)
+            except ImportError:
+                # If the resolver module isn't available, just use the input as is
+                pass
         
         try:
-            # Use provided processed input or fall back to task's input_data
-            input_to_use = processed_input if processed_input is not None else self.input_data
-
-            # Execute the handler
-            result = self.handler(input_to_use)
-
-            # Ensure result is properly formatted
+            # If handler is provided directly, use it
+            if self.handler is not None:
+                # Pass both self (task) and input_data to handler
+                result = self.handler(self, input_to_use)
+                
+            # Otherwise, use the handler registry to look up by name
+            elif hasattr(self, 'handler_name') and self.handler_name:
+                try:
+                    from core.services import get_handler_registry
+                    handler_registry = get_handler_registry()
+                    result = handler_registry.execute_handler(self.handler_name, self, input_to_use)
+                except (ImportError, ValueError) as e:
+                    return {
+                        "success": False,
+                        "error": f"Handler execution failed: {str(e)}",
+                        "error_type": type(e).__name__
+                    }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Task {self.id} has no handler function or handler_name",
+                    "error_type": "ConfigurationError"
+                }
+            
+            # Ensure result is properly formatted as a dictionary
             if not isinstance(result, dict):
-                return {"success": False, "error": f"Handler returned non-dict value: {type(result).__name__}"}
-
-            # If success flag is not present, infer from presence of error
-            if "success" not in result and "status" not in result:
+                return {
+                    "success": False,
+                    "error": f"Handler returned non-dict value: {result}",
+                    "result": result,
+                    "response": result
+                }
+                
+            # If the result doesn't have a success field, assume success if no error
+            if "success" not in result:
                 result["success"] = "error" not in result
                 
-            # Ensure both 'result' and 'response' fields are present for backward compatibility
+            # Ensure both result and response fields exist for compatibility
             if "result" in result and "response" not in result:
                 result["response"] = result["result"]
             elif "response" in result and "result" not in result:
                 result["result"] = result["response"]
-            
-            # Validate output if enabled
-            if self.validate_output:
-                from core.utils.data_validator import validate_task_output, format_validation_errors
                 
-                errors = validate_task_output(result)
-                if errors:
-                    return {
-                        "success": False,
-                        "error": f"Output validation failed: {format_validation_errors(errors)}",
-                        "error_type": "ValidationError",
-                        "error_details": {"validation_errors": [str(e) for e in errors]}
-                    }
-
             return result
-
+            
         except Exception as e:
-            # Capture any exceptions from the handler
             import traceback
-
             return {
                 "success": False,
                 "error": f"Handler execution failed: {str(e)}",
                 "error_type": type(e).__name__,
-                "traceback": traceback.format_exc(),
+                "traceback": traceback.format_exc()
             }
 
     def to_dict(self) -> Dict[str, Any]:
@@ -357,7 +388,7 @@ class DirectHandlerTask(Task):
         """
         base_dict = super().to_dict()
         base_dict["is_direct_handler"] = True
-        base_dict["handler_name"] = self.handler.__name__ if hasattr(self.handler, "__name__") else "anonymous_function"
+        base_dict["handler_name"] = self.handler_name
         return base_dict
 
     def set_tool_registry(self, tool_registry):
@@ -368,3 +399,59 @@ class DirectHandlerTask(Task):
             tool_registry: Tool registry to use for tool executions
         """
         self.tool_registry = tool_registry
+
+
+class CustomTask(Task):
+    """Base class for implementing custom task types with specialized execution logic.
+    
+    Custom tasks can define their own execution logic while leveraging the workflow
+    system's variable resolution, input processing, and conditional branching.
+    """  # noqa: D202
+    
+    def __init__(
+        self,
+        task_id: str,
+        name: str,
+        task_type: str,
+        input_data: Dict[str, Any] = None,
+        max_retries: int = 0,
+        next_task_id_on_success: Optional[str] = None,
+        next_task_id_on_failure: Optional[str] = None,
+        condition: Optional[str] = None,
+        parallel: bool = False,
+        is_llm_task: bool = False,  # Allow specifying if this is an LLM task
+        **kwargs
+    ):
+        """Initialize a custom task.
+        
+        Args:
+            task_id: Unique identifier for the task
+            name: Display name for the task
+            task_type: The type identifier for this custom task
+            input_data: Dictionary of input parameters for the task
+            max_retries: Number of times to retry the task if it fails
+            next_task_id_on_success: Task ID to execute if this task succeeds
+            next_task_id_on_failure: Task ID to execute if this task fails
+            condition: Optional condition to evaluate to determine next task
+            parallel: Whether this task can be executed in parallel with others
+            is_llm_task: Whether this task is an LLM task (default: False)
+            **kwargs: Additional task-specific parameters
+        """
+        super().__init__(
+            task_id=task_id,
+            name=name,
+            is_llm_task=is_llm_task,  # Pass the is_llm_task parameter instead of hardcoding
+            tool_name=None,     # Custom tasks don't use the tool registry directly
+            input_data=input_data,
+            max_retries=max_retries,
+            next_task_id_on_success=next_task_id_on_success,
+            next_task_id_on_failure=next_task_id_on_failure,
+            condition=condition,
+            parallel=parallel,
+            **kwargs
+        )
+        self.task_type = task_type
+        
+        # Store any additional parameters as task attributes
+        for key, value in kwargs.items():
+            setattr(self, key, value)

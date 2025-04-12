@@ -14,7 +14,7 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.utils.testing import ToolExecutionRecorder, record_tool_executions
-from core.workflow.tool_registry_access import get_tool_registry, execute_tool
+from core.tools.registry_access import get_registry as get_tool_registry, execute_tool
 from workflows.examples.document_analysis_workflow import DocumentAnalysisWorkflow
 
 
@@ -83,32 +83,79 @@ def example_3_workflow_recording():
     """Demonstrate recording tool executions from a workflow."""
     print("\n=== Example 3: Recording Workflow Tool Calls ===")
     
-    # Create the workflow
-    workflow = DocumentAnalysisWorkflow()
-    
-    # Get the workflow's tool registry
-    registry = workflow.tool_registry
-    
-    # Create a recorder
-    recorder = ToolExecutionRecorder(registry, "examples/workflow_recording.json")
-    
-    # Set the workflow to use the recorder
-    workflow.set_tool_registry(recorder)
-    
     try:
-        # Execute the workflow with a file that exists
-        print("Executing workflow with README.md...")
-        context = {
-            "document_path": "README.md"
-        }
-        result = workflow.execute(context)
-        print("Workflow execution successful")
+        # Create the workflow
+        print("Creating DocumentAnalysisWorkflow...")
+        workflow = DocumentAnalysisWorkflow()
+        print(f"Workflow created: {workflow}")
+        
+        # Get the workflow's tool registry
+        print("Getting tool registry from workflow...")
+        registry = workflow.tool_registry
+        print(f"Registry from workflow: {registry}")
+        
+        if registry is None:
+            print("Workflow has no tool registry set. Creating one...")
+            from core.tools.registry import ToolRegistry
+            registry = ToolRegistry()
+            
+            # Register the necessary tools
+            print("Registering file_system tool...")
+            def file_system_tool(path=None, operation=None, **kwargs):
+                print(f"Mock file_system tool called with path={path}, operation={operation}")
+                if operation == "read":
+                    if path and os.path.exists(path):
+                        try:
+                            with open(path, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            return {"success": True, "content": content}
+                        except Exception as e:
+                            return {"success": False, "error": f"Error reading file: {str(e)}"}
+                    else:
+                        return {"success": False, "error": f"File not found: {path}"}
+                return {"success": False, "error": "Unsupported operation"}
+            
+            registry.register_tool("file_system", file_system_tool)
+            
+            # Register mock LLM tool
+            print("Registering openai tool...")
+            def openai_tool(prompt=None, **kwargs):
+                print(f"Mock openai tool called with prompt: {prompt[:50]}...")
+                return {"success": True, "content": f"Mock response for prompt: {prompt[:30]}..."}
+            
+            registry.register_tool("openai", openai_tool)
+        
+        # Create a recorder
+        print("Creating ToolExecutionRecorder...")
+        recorder = ToolExecutionRecorder(registry, "examples/workflow_recording.json")
+        print(f"Recorder created: {recorder}")
+        
+        # Set the workflow to use the recorder
+        print("Setting workflow to use recorder...")
+        workflow.set_tool_registry(recorder)
+        
+        try:
+            # Execute the workflow with a file that exists
+            print("Executing workflow with README.md...")
+            context = {
+                "document_path": "README.md"
+            }
+            result = workflow.execute(context)
+            print(f"Workflow execution successful: {result}")
+        except Exception as e:
+            print(f"Workflow execution failed: {e}")
+            import traceback
+            print(traceback.format_exc())
+        
+        # Save the recordings
+        print("Saving recordings...")
+        recorder.save_recordings()
+        print(f"Saved workflow recordings to {recorder.recording_file}")
+        
     except Exception as e:
-        print(f"Workflow execution failed: {e}")
-    
-    # Save the recordings
-    recorder.save_recordings()
-    print(f"Saved workflow recordings to {recorder.recording_file}")
+        print(f"Error in example_3_workflow_recording: {e}")
+        import traceback
+        print(traceback.format_exc())
 
 
 def example_4_generate_mocks_from_recording():

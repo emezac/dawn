@@ -5,7 +5,7 @@ This task extracts entities from a document using an LLM.
 """
 
 from typing import Dict, Any
-from core.workflow.task import Task
+from core.task import Task
 
 
 class ExtractEntitiesTask(Task):
@@ -17,6 +17,14 @@ class ExtractEntitiesTask(Task):
     2. Uses an LLM to extract entities
     3. Returns the extracted entities
     """  # noqa: D202
+    
+    def __init__(self):
+        """Initialize the task."""
+        super().__init__(
+            task_id="extract_entities", 
+            name="Extract Entities Task",
+            tool_name="openai"
+        )
     
     def execute(self, context):
         """

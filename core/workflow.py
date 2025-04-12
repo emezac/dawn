@@ -49,13 +49,17 @@ class Workflow:
         self.tasks[task.id] = task
         self.task_order.append(task.id)
 
-    def get_task(self, task_id: str) -> Task:
+    def get_task(self, task_id: str) -> Optional[Task]:
         """
         Get a task by its ID.
+        
+        Args:
+            task_id: ID of the task to retrieve
+            
+        Returns:
+            The task with the given ID, or None if not found
         """
-        if task_id not in self.tasks:
-            raise KeyError(f"Task with id {task_id} not found in workflow")
-        return self.tasks[task_id]
+        return self.tasks.get(task_id)  # Use dict.get() which returns None if key not found
 
     def get_next_task(self) -> Optional[Task]:
         """
@@ -121,20 +125,17 @@ class Workflow:
                 if task.status == "failed"
             ]
 
-    def set_error(self, error_message: str, error_code: str = ErrorCode.FRAMEWORK_WORKFLOW_ERROR, details: Optional[Dict[str, Any]] = None) -> None:
+    def set_error(self, error_message: str, error_code: str = None) -> None:
         """
-        Set error information for the workflow.
+        Set workflow error information.
         
         Args:
-            error_message: Human-readable error message
-            error_code: Error code from ErrorCode class
-            details: Additional error details
+            error_message: Error message describing the failure
+            error_code: Optional error code identifier
         """
+        self.status = "failed"
         self.error = error_message
         self.error_code = error_code
-        
-        if details:
-            self.error_details.update(details)
 
     def is_completed(self) -> bool:
         """

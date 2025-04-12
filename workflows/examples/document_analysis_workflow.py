@@ -6,14 +6,24 @@ It includes error handling for common failure cases.
 """
 
 from typing import Dict, Any, List
-from core.workflow.workflow import Workflow
-from core.workflow.task import Task, TaskStatus
+from core.workflow import Workflow
+from core.task import Task
+from core.utils.testing import TaskStatus
 from tasks.examples.extract_entities_task import ExtractEntitiesTask
 from tasks.examples.summarize_document_task import SummarizeDocumentTask
+import types
 
 
 class ReadDocumentTask(Task):
     """Task to read a document from the file system."""  # noqa: D202
+    
+    def __init__(self):
+        """Initialize the task."""
+        super().__init__(
+            task_id="read_document", 
+            name="Read Document Task",
+            tool_name="file_system"
+        )
     
     def execute(self, context):
         """Execute the task."""
@@ -44,6 +54,14 @@ class ReadDocumentTask(Task):
 class HandleFileNotFoundTask(Task):
     """Task to handle file not found errors."""  # noqa: D202
     
+    def __init__(self):
+        """Initialize the task."""
+        super().__init__(
+            task_id="handle_file_not_found", 
+            name="Handle File Not Found Task",
+            tool_name="error_handler"
+        )
+    
     def execute(self, context):
         """Execute the task."""
         document_path = context.variables.get("document_path", "Unknown file")
@@ -57,6 +75,14 @@ class HandleFileNotFoundTask(Task):
 
 class HandleLLMErrorTask(Task):
     """Task to handle LLM API errors."""  # noqa: D202
+    
+    def __init__(self):
+        """Initialize the task."""
+        super().__init__(
+            task_id="handle_llm_error", 
+            name="Handle LLM Error Task",
+            tool_name="error_handler"
+        )
     
     def execute(self, context):
         """Execute the task."""
@@ -85,7 +111,7 @@ class DocumentAnalysisWorkflow(Workflow):
     
     def __init__(self):
         """Initialize the workflow."""
-        super().__init__()
+        super().__init__(workflow_id="document_analysis_workflow", name="Document Analysis Workflow")
         self.tasks = {
             "read_document": ReadDocumentTask(),
             "extract_entities": ExtractEntitiesTask(),
@@ -93,6 +119,13 @@ class DocumentAnalysisWorkflow(Workflow):
             "handle_file_not_found": HandleFileNotFoundTask(),
             "handle_llm_error": HandleLLMErrorTask()
         }
+        self.tool_registry = None  # Will be set later with set_tool_registry
+    
+    def set_tool_registry(self, registry):
+        """Set the tool registry for the workflow and all its tasks."""
+        self.tool_registry = registry
+        for task in self.tasks.values():
+            task.tool_registry = registry
     
     def get_next_task(self, context):
         """
@@ -135,3 +168,101 @@ class DocumentAnalysisWorkflow(Workflow):
         
         # Workflow is complete if we reach here
         return None 
+
+    def execute(self, context):
+        """
+        Execute the workflow with the given context.
+        
+        Args:
+            context: Dictionary or ExecutionContext with variables for the workflow
+            
+        Returns:
+            Dictionary with execution results
+        """
+        if not hasattr(context, 'variables'):
+            # If context is a dict, convert it to a simple ExecutionContext
+            from core.utils.testing import ExecutionContext
+            context = ExecutionContext(variables=context)
+        
+        # Add missing methods if using the simple ExecutionContext from testing
+        if not hasattr(context, 'get_last_executed_task'):
+            def get_last_executed_task(self):
+                """Get the ID of the last executed task."""
+                if not self.task_data:
+                    return None
+                return list(self.task_data.keys())[-1]
+            context.get_last_executed_task = types.MethodType(get_last_executed_task, context)
+        
+        if not hasattr(context, 'get_task_status'):
+            def get_task_status(self, task_id):
+                """Get the status of a task."""
+                if task_id not in self.task_data:
+                    return TaskStatus.PENDING
+                return TaskStatus.COMPLETED if self.task_data[task_id].get('status') == 'completed' else TaskStatus.FAILED
+            context.get_task_status = types.MethodType(get_task_status, context)
+        
+        if not hasattr(context, 'get_task_error'):
+            def get_task_error(self, task_id):
+                """Get the error of a task."""
+                if task_id not in self.task_data:
+                    return None
+                return self.task_data[task_id].get('error')
+            context.get_task_error = types.MethodType(get_task_error, context)
+        
+        if not hasattr(context, 'is_task_completed'):
+            def is_task_completed(self, task_id):
+                """Check if a task is completed."""
+                if task_id not in self.task_data:
+                    return False
+                return self.task_data[task_id].get('status') == 'completed'
+            context.is_task_completed = types.MethodType(is_task_completed, context)
+        
+        if not hasattr(context, 'is_task_executed'):
+            def is_task_executed(self, task_id):
+                """Check if a task has been executed."""
+                return task_id in self.task_data
+            context.is_task_executed = types.MethodType(is_task_executed, context)
+        
+        # Initialize workflow
+        self.status = "running"
+        context.task_data = {}
+        
+        # Execute tasks in sequence based on the get_next_task logic
+        current_task_id = self.get_next_task(context)
+        while current_task_id:
+            # Get the task
+            task = self.tasks.get(current_task_id)
+            if not task:
+                self.set_status("failed")
+                return {"success": False, "error": f"Task '{current_task_id}' not found"}
+            
+            # Execute the task
+            print(f"Executing task: {task.id} ({task.__class__.__name__})")
+            try:
+                task_result = task.execute(context)
+                task.status = "completed"
+                context.task_data[task.id] = {
+                    "status": "completed",
+                    "result": task_result
+                }
+            except Exception as e:
+                task.status = "failed"
+                context.task_data[task.id] = {
+                    "status": "failed",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+                
+                # Store the exception for error handling paths
+                context.variables["error"] = str(e)
+                
+                # Move to next task based on error handling logic
+                current_task_id = self.get_next_task(context)
+                continue
+            
+            # Get the next task
+            current_task_id = self.get_next_task(context)
+        
+        # Workflow completed
+        self.set_status("completed")
+        return {"success": True, "context": context.variables} 

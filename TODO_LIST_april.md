@@ -94,12 +94,15 @@
 
 ### 6. Workflow Engine Improvements
 
-- [ ] **Refactor WorkflowEngine to support pluggable task execution**
+- [x] **Refactor WorkflowEngine to support pluggable task execution**
   - Modify execute_task method to use strategy pattern
   - Support custom task types with their own execution logic
-  - Improve condition evaluation with proper variable scoping
+  - [x] Improve condition evaluation with proper variable scoping
+    - Updated Workflow.get_task to safely return None instead of raising exceptions
+    - Enhanced DirectHandlerTask to support both old and new handler function signatures
+    - Fixed variable resolution by improving Task.to_dict() method
 
-- [ ] **Add native support for direct handler execution**
+- [x] **Add native support for direct handler execution**
   - Remove the need for monkey patching by supporting direct handlers natively
   - Create a registry for tool handler functions
   - Support both registry-based and direct handler execution

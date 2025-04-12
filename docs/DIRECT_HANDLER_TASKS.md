@@ -2,43 +2,37 @@
 
 ## Overview
 
-`DirectHandlerTask` is a core feature of the Dawn framework that allows you to create tasks that execute a function directly without requiring registration in the global tool registry. This provides a more flexible, maintainable, and testable approach to defining custom task logic.
+DirectHandlerTask is a specialized task type in the Dawn Framework that enables direct execution of Python functions without requiring registration in the global tool registry. This provides a more flexible, maintainable, and testable approach to defining custom task logic.
 
-## When to Use DirectHandlerTask
+DirectHandlerTask supports two execution modes:
+1. **Direct handler function**: Pass a Python function directly via the `handler` parameter
+2. **Registry-based handler**: Pass a string name via `handler_name` parameter that will be looked up in the HandlerRegistry
 
-- **Custom Logic**: When you need to execute custom logic that doesn't warrant a global tool
-- **Workflow-Specific Tasks**: For tasks that are specific to a particular workflow
-- **Testing**: For easier testing of workflows with mock handlers
-- **Rapid Development**: To quickly iterate on task implementations without registry management
-- **Lightweight Tasks**: For simple transformations or processing that don't need tool infrastructure
+## Key Benefits
 
-## DirectHandlerTask vs. Registry Tools
+- **Simplified Workflow Development**: Define task logic directly in your workflow code
+- **Reduced Boilerplate**: No need to register tools for workflow-specific functions
+- **Improved Testing**: Easier to mock and test with direct function references
+- **Better Code Organization**: Keep workflow-specific logic with the workflow definition
+- **Enhanced Modularity**: Separate concerns between global tools and workflow-specific handlers
 
-| Feature | DirectHandlerTask | Registry Tools |
-|---------|-------------------|---------------|
-| **Registration** | No registry entry needed | Must be registered globally |
-| **Scope** | Local to workflow | Global across application |
-| **Testing** | Easy to mock and test | Requires registry mocking |
-| **Reusability** | Limited to workflow | Reusable across workflows |
-| **Overhead** | Minimal | Higher due to registry lookup |
-| **Use Case** | Workflow-specific logic | Common reusable functionality |
+## Usage Modes
 
-## Creating a DirectHandlerTask
+### Mode 1: Direct Handler Function
 
-### Basic Example
+Pass a Python function directly to the task:
 
 ```python
 from core.task import DirectHandlerTask
 
-# Define a handler function
-def process_data(input_data):
+def process_data(task, input_data):
+    # Process the input data
     result = input_data.get("value", 0) * 2
     return {
         "success": True,
         "result": result
     }
 
-# Create a DirectHandlerTask with the handler
 task = DirectHandlerTask(
     task_id="double_value_task",
     name="Double Value Task",
@@ -46,223 +40,183 @@ task = DirectHandlerTask(
     input_data={"value": 21}
 )
 
-# Add to workflow
 workflow.add_task(task)
 ```
 
-### Handler Function Requirements
+### Mode 2: Registry-Based Handler
 
-Your handler function should:
-
-1. Accept a single dictionary parameter containing the task input data
-2. Return a dictionary with at least:
-   - `success`: Boolean indicating success or failure
-   - `result`: The output data on success
-   - `error`: Error message on failure (optional)
-
-Example handler function:
+Reference a handler function by name that's registered in a HandlerRegistry:
 
 ```python
-def sample_handler(data):
-    try:
-        # Process the input data
-        result = perform_calculation(data)
-        return {
-            "success": True,
-            "result": result
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Processing failed: {str(e)}"
-        }
-```
+from core.task import DirectHandlerTask
+from core.services import get_handler_registry
 
-## Advanced Usage
+# Register the handler (typically done during application startup)
+handler_registry = get_handler_registry()
 
-### Conditional Tasks
-
-```python
-# Create a task with a condition
-validation_task = DirectHandlerTask(
-    task_id="validate_input",
-    name="Validate Input Data",
-    handler=validate_data,
-    input_data={"data": user_input},
-    condition="output_data.get('is_valid') == True",
-    next_task_id_on_success="process_data",
-    next_task_id_on_failure="handle_invalid_data"
-)
-```
-
-### Using Dependencies in Handlers
-
-```python
-from services.data_service import DataService
-
-# Handler that uses external service
-def fetch_user_data(input_data):
-    user_id = input_data.get("user_id")
-    if not user_id:
-        return {"success": False, "error": "Missing user_id"}
-    
-    data_service = DataService()
-    try:
-        user_data = data_service.get_user(user_id)
-        return {
-            "success": True,
-            "result": user_data
-        }
-    except Exception as e:
-        return {
-            "success": False, 
-            "error": f"Failed to fetch user data: {str(e)}"
-        }
-
-# Create the task
-fetch_task = DirectHandlerTask(
-    task_id="fetch_user",
-    name="Fetch User Data",
-    handler=fetch_user_data,
-    input_data={"user_id": "12345"}
-)
-```
-
-### Using Lambda Functions
-
-For simple operations, you can use lambda functions:
-
-```python
-# Simple transformation using lambda
-transform_task = DirectHandlerTask(
-    task_id="format_name",
-    name="Format User Name",
-    handler=lambda data: {
+@handler_registry.register()
+def process_data(input_data):
+    result = input_data.get("value", 0) * 2
+    return {
         "success": True,
-        "result": f"{data.get('first_name', '')} {data.get('last_name', '')}".strip()
-    },
-    input_data={"first_name": "John", "last_name": "Doe"}
+        "result": result
+    }
+
+# Create a task that references the handler by name
+task = DirectHandlerTask(
+    task_id="double_value_task",
+    name="Double Value Task",
+    handler_name="process_data",  # References the registered handler
+    input_data={"value": 21}
 )
+
+workflow.add_task(task)
 ```
+
+## Handler Function Requirements
+
+Handler functions can follow either of two patterns:
+
+1. **Two-parameter form (recommended)**:
+   ```python
+   def handler(task, input_data):
+       # task: The DirectHandlerTask instance
+       # input_data: Dictionary containing the processed input
+       return {"success": True, "result": "Task completed"}
+   ```
+
+2. **Single-parameter form**:
+   ```python
+   def handler(input_data):
+       # input_data: Dictionary containing the processed input
+       return {"success": True, "result": "Task completed"}
+   ```
+
+The handler function should return a dictionary with at least:
+- `success`: Boolean indicating success or failure
+- `result`: The output data on success
+- `error`: Error message on failure (optional)
+
+## Integration with the WorkflowEngine
+
+The Dawn Framework includes a `DirectHandlerTaskExecutionStrategy` class that automatically handles the execution of `DirectHandlerTask` instances. This strategy:
+
+1. Checks if the task has a direct handler function
+2. If not, looks up the handler by name in the `HandlerRegistry`
+3. Executes the handler with appropriate parameters
+4. Standardizes the result format
+
+## Error Handling
+
+DirectHandlerTask has robust error handling capabilities:
+
+- **Non-Dictionary Results**: If a handler returns a non-dictionary value, it's treated as a failure with an error message
+- **Exception Handling**: Exceptions raised by the handler are caught and returned as standardized error responses
+- **Missing Handlers**: Errors when a handler can't be found by name are properly handled and reported
+
+## When to Use DirectHandlerTask
+
+- **Custom Logic**: For workflow-specific functions that don't need global availability
+- **Rapid Development**: For quick prototyping without tool registry management
+- **Testing**: For easier testing with mock handlers
+- **Simple Transformations**: For lightweight data processing or formatting
+- **Integration Points**: For connecting workflows to external systems or APIs
+
+## DirectHandlerTask vs. Registry Tools
+
+| Feature | DirectHandlerTask | Registry Tools |
+|---------|-------------------|---------------|
+| **Registration** | No global registry entry needed | Must be registered globally |
+| **Scope** | Local to workflow | Global across application |
+| **Testing** | Easy to mock and test | Requires registry mocking |
+| **Reusability** | Limited to workflow | Reusable across workflows |
+| **Overhead** | Minimal | Higher due to registry lookup |
+| **Use Case** | Workflow-specific logic | Common reusable functionality |
 
 ## Best Practices
 
-1. **Keep Handlers Focused**: Each handler should do one thing well
-2. **Handle Errors Gracefully**: Always return proper error responses
-3. **Validate Inputs**: Check required fields at the start of your handler
-4. **Use Descriptive Names**: Give handlers and tasks meaningful names
-5. **Document Complex Logic**: Add docstrings to handler functions
-6. **Consider Performance**: For computationally intensive tasks, consider async execution
-7. **Test Thoroughly**: Write unit tests for handler functions and integration tests for workflows
+1. **Choose the Right Mode**:
+   - Use direct handler functions for workflow-specific logic
+   - Use registry-based handlers for reusable functions shared across workflows
 
-## Converting Monkey-Patched Tasks
+2. **Follow Return Format Conventions**:
+   - Always return dictionaries with the standard `success` key
+   - Include `result` for successful operations
+   - Include `error` for failures
 
-If you were previously using monkey-patched DirectHandlerTasks, here's how to convert them:
+3. **Keep Handlers Focused**:
+   - Each handler should do one thing well
+   - Complex logic should be broken down into multiple tasks
 
-Before:
-```python
-# Monkey-patched DirectHandlerTask
-class DirectHandlerTask(Task):
-    def __init__(self, task_id, name, handler, input_data=None, condition=None, 
-                next_task_id_on_success=None, next_task_id_on_failure=None, max_retries=0):
-        super().__init__(
-            task_id=task_id,
-            name=name,
-            tool_name="_direct_handler_",
-            is_llm_task=False,
-            input_data=input_data,
-            condition=condition,
-            next_task_id_on_success=next_task_id_on_success,
-            next_task_id_on_failure=next_task_id_on_failure,
-            max_retries=max_retries,
-        )
-        self.handler = handler
-        self._is_direct_handler = True
+4. **Provide Clear Names**:
+   - Use descriptive `task_id` and `name` values
+   - Use meaningful function names for registry-based handlers
 
-    def execute(self, agent=None):
-        result = self.handler(self.input_data)
-        self.output_data = result
-        return result.get("success", False)
+5. **Handle Errors Gracefully**:
+   - Catch and handle exceptions within your handlers when appropriate
+   - Format error messages to be user-friendly
+   - Include enough context for debugging
 
-# Monkey-patched WorkflowEngine
-original_execute_task = WorkflowEngine.execute_task
-def patched_execute_task(self, task):
-    if isinstance(task, DirectHandlerTask):
-        result = task.execute(agent=None)
-        return result
-    else:
-        return original_execute_task(self, task)
-WorkflowEngine.execute_task = patched_execute_task
-```
-
-After:
-```python
-from core.task import DirectHandlerTask
-
-# Use the built-in DirectHandlerTask
-task = DirectHandlerTask(
-    task_id="my_task",
-    name="My Task",
-    handler=my_handler_function,
-    input_data=input_data
-)
-
-# No need to monkey-patch the WorkflowEngine!
-```
-
-## Testing DirectHandlerTasks
-
-### Unit Testing a Handler
+## Example Workflow Using DirectHandlerTask
 
 ```python
-import unittest
-
-class TestHandlers(unittest.TestCase):
-    def test_data_processor(self):
-        # Test the handler function directly
-        result = process_data({"value": 10})
-        self.assertTrue(result["success"])
-        self.assertEqual(result["result"], 20)
-        
-        # Test with invalid input
-        result = process_data({"wrong_key": 10})
-        self.assertTrue(result["success"])  # Should still succeed
-        self.assertEqual(result["result"], 0)  # Default value * 2
-```
-
-### Integration Testing with Workflows
-
-```python
-from unittest.mock import MagicMock
-from core.engine import WorkflowEngine
-from core.task import DirectHandlerTask
 from core.workflow import Workflow
+from core.task import DirectHandlerTask, Task
 
-class TestWorkflow(unittest.TestCase):
-    def test_workflow_with_direct_handlers(self):
-        # Create a workflow with a DirectHandlerTask
-        workflow = Workflow(workflow_id="test_wf", name="Test Workflow")
-        
-        # Create a task with a mock handler
-        mock_handler = MagicMock(return_value={"success": True, "result": "Processed"})
-        task = DirectHandlerTask(
-            task_id="mock_task",
-            name="Mock Task",
-            handler=mock_handler
-        )
-        workflow.add_task(task)
-        
-        # Run the workflow
-        engine = WorkflowEngine(workflow=workflow, 
-                              llm_interface=MagicMock(), 
-                              tool_registry=MagicMock())
-        result = engine.run()
-        
-        # Verify the handler was called
-        mock_handler.assert_called_once()
-        self.assertEqual(result["status"], "completed")
-```
+def validate_input(task, input_data):
+    user_id = input_data.get("user_id")
+    if not user_id:
+        return {
+            "success": False,
+            "error": "Missing user_id parameter"
+        }
+    return {
+        "success": True,
+        "result": {"valid": True, "user_id": user_id}
+    }
 
-## Conclusion
+def process_results(task, input_data):
+    # Process the results from the previous task
+    user_data = input_data.get("user_data", {})
+    return {
+        "success": True,
+        "result": {
+            "user_id": user_data.get("id"),
+            "name": user_data.get("name"),
+            "processed": True
+        }
+    }
 
-`DirectHandlerTask` provides a powerful way to create custom task logic without the overhead of tool registration. By integrating your functions directly into the workflow, you can create more self-contained, testable, and maintainable workflows. 
+# Create workflow
+workflow = Workflow(workflow_id="user_processor", name="User Processor Workflow")
+
+# Add validation task using direct handler
+validation_task = DirectHandlerTask(
+    task_id="validate_input",
+    name="Validate Input Parameters",
+    handler=validate_input,
+    input_data={"user_id": "${user_id}"},
+    next_task_id_on_success="fetch_user_data",
+    next_task_id_on_failure=None  # End workflow on validation failure
+)
+workflow.add_task(validation_task)
+
+# Add tool task to fetch user data
+fetch_task = Task(
+    task_id="fetch_user_data",
+    name="Fetch User Data",
+    tool_name="fetch_user",
+    input_data={"user_id": "${validate_input.result.user_id}"},
+    next_task_id_on_success="process_results"
+)
+workflow.add_task(fetch_task)
+
+# Add processing task using direct handler
+process_task = DirectHandlerTask(
+    task_id="process_results",
+    name="Process User Data",
+    handler=process_results,
+    input_data={"user_data": "${fetch_user_data.result}"}
+)
+workflow.add_task(process_task)
+``` 

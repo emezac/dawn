@@ -11,11 +11,14 @@ and supports both LLM-based and tool-based operations within a single execution 
 import asyncio
 import copy  # Import deepcopy
 import re
-from typing import Any, Dict, List, Optional
+import importlib
+from typing import Any, Dict, List, Optional, Callable
 
 from core.llm.interface import LLMInterface
 from core.task import Task
+from core.task_execution_strategy import TaskExecutionStrategyFactory
 from core.tools.registry import ToolRegistry
+from core.tools.handler_registry import HandlerRegistry
 
 # Assuming logger setup is done elsewhere and functions are imported
 from core.utils.logger import (  # Keep imports
@@ -38,20 +41,63 @@ class AsyncWorkflowEngine:
     input/output variable substitution.
     """  # noqa: D202
 
-    def __init__(self, workflow: Workflow, llm_interface: LLMInterface, tool_registry: ToolRegistry):
+    def __init__(
+        self, 
+        workflow: Workflow, 
+        llm_interface: LLMInterface, 
+        tool_registry: ToolRegistry,
+        handler_registry: Optional[HandlerRegistry] = None
+    ):
         """Initialize the asynchronous workflow engine.
 
         Args:
             workflow: The Workflow object to execute.
             llm_interface: An instance of LLMInterface for LLM tasks.
             tool_registry: An instance of ToolRegistry containing available tools.
+            handler_registry: An optional HandlerRegistry for direct handler tasks.
         """
         self.workflow = workflow
         self.llm_interface = llm_interface
         self.tool_registry = tool_registry
+        self.handler_registry = handler_registry
+        self.strategy_factory = TaskExecutionStrategyFactory(llm_interface, tool_registry, handler_registry)
+        
+        # Initialize the condition evaluation helper functions
+        self._condition_helper_funcs = {}
+        
         # Keep essential init logs
         log_info(f"AsyncWorkflowEngine initialized for workflow '{workflow.name}' (ID: {workflow.id})")
         log_info(f"Using ToolRegistry instance {id(tool_registry)} with tools: {list(tool_registry.tools.keys())}")
+        if handler_registry:
+            log_info(f"Using HandlerRegistry with handlers: {handler_registry.list_handlers()}")
+
+    def register_condition_helper(self, name: str, function: Callable) -> None:
+        """Register a helper function for use in condition evaluation.
+        
+        Args:
+            name: The name to use when calling the function from conditions
+            function: The function to register
+        """
+        if name in self._condition_helper_funcs:
+            log_info(f"Replacing existing condition helper function '{name}'")
+        self._condition_helper_funcs[name] = function
+        log_info(f"Registered condition helper function '{name}'")
+
+    def set_handler_registry(self, handler_registry: HandlerRegistry) -> None:
+        """
+        Set the handler registry to be used for direct handler tasks.
+        
+        Args:
+            handler_registry: The HandlerRegistry instance to use
+        """
+        self.handler_registry = handler_registry
+        # Update the strategy factory with the new handler registry
+        self.strategy_factory = TaskExecutionStrategyFactory(
+            self.llm_interface, 
+            self.tool_registry, 
+            handler_registry
+        )
+        log_info(f"Set HandlerRegistry with handlers: {handler_registry.list_handlers()}")
 
     def _resolve_value(self, ref_task_id: str, path_parts: List[str]) -> Any:
         """Helper to get a value from a referenced task's output."""
@@ -213,91 +259,26 @@ class AsyncWorkflowEngine:
         # log_info(f"--- Finished processing input for task '{task.id}'. Final: {processed_input} ---") # Reduce verbosity
         return processed_input
 
-    async def async_execute_llm_task(self, task: Task) -> Dict[str, Any]:
-        """Executes an LLM task using the LLMInterface."""
-        # log_task_input(task.id, task.input_data) # Log original input only if needed
-        processed_input = self.process_task_input(task)
-        # log_info(f"Processed input for LLM task '{task.id}': {processed_input}") # Reduce verbosity
-
-        prompt = processed_input.get("prompt", "")
-        if not prompt:
-            log_error(f"No 'prompt' found in processed input for LLM task '{task.id}'.")
-            return {"success": False, "error": "No prompt provided for LLM task"}
-        try:
-            result = await asyncio.to_thread(self.llm_interface.execute_llm_call, prompt)
-            if result.get("success"):
-                # log_task_output(task.id, result) # Log raw output only if needed
-                return {"success": True, "response": result.get("response")}
-            else:
-                error_msg = result.get("error", "Unknown LLM error")
-                log_error(f"LLM task '{task.id}' failed: {error_msg}")
-                return {"success": False, "error": error_msg}
-        except Exception as e:
-            log_error(f"Exception during async execution of LLM task '{task.id}': {e}", exc_info=True)
-            return {"success": False, "error": f"Async execution wrapper error: {str(e)}"}
-
-    async def async_execute_tool_task(self, task: Task) -> Dict[str, Any]:
-        """Executes a tool task using the ToolRegistry."""
-        # log_task_input(task.id, task.input_data) # Log original input only if needed
-        processed_input = self.process_task_input(task)
-        # log_info(f"Processed input for tool task '{task.id}' ('{task.tool_name}'): {processed_input}") # Reduce verbosity
-
-        if not task.tool_name:
-            log_error(f"No 'tool_name' specified for tool task '{task.id}'.")
-            return {"success": False, "error": "Tool name not specified"}
-        try:
-            result = await asyncio.to_thread(self.tool_registry.execute_tool, task.tool_name, processed_input)
-            if result.get("success"):
-                # log_task_output(task.id, result) # Log raw output only if needed
-                return {"success": True, "result": result.get("result")}
-            else:
-                error_msg = result.get("error", "Unknown tool error")
-                log_error(f"Tool task '{task.id}' ('{task.tool_name}') failed: {error_msg}")
-                return {"success": False, "error": error_msg}
-        except Exception as e:
-            log_error(
-                f"Exception during async execution of tool task '{task.id}' ('{task.tool_name}'): {e}", exc_info=True
-            )
-            return {"success": False, "error": f"Async execution wrapper error: {str(e)}"}
-
-    async def async_execute_direct_handler_task(self, task: Task) -> Dict[str, Any]:
-        """Executes a DirectHandlerTask by calling its execute method directly."""
-        processed_input = self.process_task_input(task)
-        
-        try:
-            # Execute the DirectHandlerTask's execute method
-            result = task.execute(processed_input)
-            
-            if result.get("success"):
-                return {"success": True, "result": result.get("result", result.get("response", {}))}
-            else:
-                error_msg = result.get("error", "Unknown DirectHandlerTask error")
-                log_error(f"DirectHandlerTask '{task.id}' failed: {error_msg}")
-                return {"success": False, "error": error_msg}
-        except Exception as e:
-            log_error(f"Exception during execution of DirectHandlerTask '{task.id}': {e}", exc_info=True)
-            return {"success": False, "error": f"DirectHandlerTask execution error: {str(e)}"}
-
     async def async_execute_task(self, task: Task) -> bool:
         """Executes a single task, handles retries, sets output and status."""
-        log_task_start(task.id, task.name, self.workflow.id)  # Keep start log
+        log_task_start(task.id, task.name, self.workflow.id)
         task.set_status("running")
-        execution_result: Dict[str, Any] = {}
-
+        
         try:
-            # Check if this is a DirectHandlerTask
-            if hasattr(task, "is_direct_handler") and task.is_direct_handler:
-                execution_result = await self.async_execute_direct_handler_task(task)
-            elif task.is_llm_task:
-                execution_result = await self.async_execute_llm_task(task)
-            else:
-                execution_result = await self.async_execute_tool_task(task)
+            # Process the task input data
+            processed_input = self.process_task_input(task)
+            
+            # Get the appropriate strategy for the task
+            strategy = self.strategy_factory.get_strategy(task)
+            
+            # Execute the task using the strategy
+            execution_result = await strategy.execute(task, processed_input=processed_input)
 
             if execution_result.get("success"):
                 task.set_status("completed")
                 output_key = "response" if task.is_llm_task else "result"
                 task.set_output({output_key: execution_result.get(output_key)})
-                log_task_end(task.id, task.name, "completed", self.workflow.id)  # Keep end log
+                log_task_end(task.id, task.name, "completed", self.workflow.id)
                 return True
             else:
                 return await self.async_handle_task_failure(task, execution_result)
@@ -308,21 +289,109 @@ class AsyncWorkflowEngine:
             )
             return await self.async_handle_task_failure(task, {"error": f"Unhandled engine error: {str(e)}"})
 
-    async def async_handle_task_failure(self, task: Task, result_data: Dict[str, Any]) -> bool:
-        """Handles failed tasks, including retries."""
-        error_message = result_data.get("error", "Unknown failure reason")
+    async def async_handle_task_failure(self, task: Task, execution_result: Dict[str, Any]) -> bool:
+        """Handle a task failure, including retries and workflow error handling."""
+        retry_count = task.get_retry_count()
+        max_retries = task.get_max_retries()
 
-        if task.can_retry():
-            task.increment_retry()
-            log_task_retry(task.id, task.name, task.retry_count, task.max_retries)  # Keep retry log
-            task.set_status("pending")
-            await asyncio.sleep(0.2)
+        if retry_count < max_retries:
+            task.increment_retry_count()
+            log_task_retry(task.id, task.name, retry_count + 1, max_retries)
+            task.set_status("retrying")
+            await asyncio.sleep(1)  # Small delay before retry
             return await self.async_execute_task(task)
         else:
             task.set_status("failed")
+            error_message = execution_result.get("error", "Unknown error")
             task.set_output({"error": error_message})
-            log_task_end(task.id, task.name, "failed", self.workflow.id)  # Keep end log (failed)
+            log_task_end(task.id, task.name, "failed", self.workflow.id, error_message)
             return False
+            
+    async def find_next_tasks(self, current_task: Task, success: bool = True) -> List[Task]:
+        """Determine the next tasks to execute based on the current task's outcome.
+        
+        Args:
+            current_task: The current Task that has completed execution
+            success: Whether the current task completed successfully
+            
+        Returns:
+            A list of Task objects to execute next
+        """
+        next_task_ids = []
+        
+        if success:
+            # For successful tasks, use the normal transitions
+            if current_task.id in self.workflow.transitions:
+                next_task_ids = self.workflow.transitions[current_task.id]
+        else:
+            # For failed tasks, use the on_failure transitions if defined
+            if hasattr(current_task, "on_failure") and current_task.on_failure:
+                next_task_ids = [current_task.on_failure]
+        
+        next_tasks = []
+        for task_id in next_task_ids:
+            if task_id in self.workflow.tasks:
+                next_tasks.append(self.workflow.tasks[task_id])
+            else:
+                log_warning(f"Invalid transition from '{current_task.id}' to non-existent task '{task_id}'")
+        
+        return next_tasks
+
+    async def find_and_execute_next_tasks(self, current_task: Task, success: bool = True) -> None:
+        """Find and execute the next tasks based on the current task's outcome.
+        
+        Args:
+            current_task: The current Task that has completed execution
+            success: Whether the current task completed successfully
+        """
+        next_tasks = await self.find_next_tasks(current_task, success)
+        
+        if not next_tasks:
+            log_info(f"No next tasks found for task '{current_task.id}' (success={success})")
+            return
+            
+        for next_task in next_tasks:
+            # Schedule each next task for execution
+            self.pending_tasks.append(next_task)
+
+    def _build_condition_context(self, task: Task) -> Dict[str, Any]:
+        """Build a context dictionary for condition evaluation with safe variable access.
+        
+        Args:
+            task: The task whose condition is being evaluated
+            
+        Returns:
+            A dictionary with variable bindings for condition evaluation
+        """
+        context = {
+            "output_data": task.output_data,  # Current task's output
+            "task": task,  # Current task object (for advanced conditions)
+            "workflow_id": self.workflow.id,  # Workflow ID
+            "workflow_name": self.workflow.name,  # Workflow name
+            "task_id": task.id,  # Current task ID (convenience)
+            "task_status": task.status,  # Current task status (convenience)
+        }
+        
+        # Add helper functions
+        for func_name, func in self._condition_helper_funcs.items():
+            context[func_name] = func
+            
+        # Add access to other task outputs with safety checks
+        task_outputs = {}
+        for task_id, other_task in self.workflow.tasks.items():
+            if other_task.status == "completed":
+                task_outputs[task_id] = other_task.output_data
+            else:
+                task_outputs[task_id] = None
+        context["task_outputs"] = task_outputs
+        
+        # Add workflow variables 
+        if hasattr(self.workflow, "variables") and isinstance(self.workflow.variables, dict):
+            context["workflow_vars"] = self.workflow.variables
+        else:
+            context["workflow_vars"] = {}
+            
+        return context
 
     def get_next_task_by_condition(self, current_task: Task) -> Optional[Task]:
         """Determines the next task based on status, condition, and branches."""
@@ -341,14 +410,28 @@ class AsyncWorkflowEngine:
         if current_task.status == "completed" and current_task.condition:
             condition_evaluated = True
             try:
+                # Build a rich context for condition evaluation
+                eval_context = self._build_condition_context(current_task)
+                
+                # Create a restricted builtins dict with only safe operations
+                safe_builtins = {
+                    "True": True, "False": False, "None": None,
+                    "abs": abs, "all": all, "any": any, "bool": bool, 
+                    "dict": dict, "float": float, "int": int, "len": len,
+                    "list": list, "max": max, "min": min, "round": round,
+                    "sorted": sorted, "str": str, "sum": sum, "tuple": tuple,
+                    "type": type
+                }
+                
+                # Execute the condition with the prepared context
                 condition_met = bool(
                     eval(
                         current_task.condition,
-                        {"__builtins__": {}},
-                        {"output_data": current_task.output_data},
+                        {"__builtins__": safe_builtins},
+                        eval_context
                     )
                 )
-                # log_info(f"Condition '{current_task.condition}' for task '{current_task.id}' evaluated to: {condition_met}") # Optional log
+                log_info(f"Condition '{current_task.condition}' for task '{current_task.id}' evaluated to: {condition_met}")
             except Exception as e:
                 log_error(
                     f"Error evaluating condition '{current_task.condition}' for task '{current_task.id}': {e}. Defaulting to failure path."
@@ -358,7 +441,7 @@ class AsyncWorkflowEngine:
             next_task_id = (
                 current_task.next_task_id_on_success if condition_met else current_task.next_task_id_on_failure
             )
-            # log_info(f"Condition path selected for '{current_task.id}': '{next_task_id}'") # Optional log
+            log_info(f"Condition path selected for '{current_task.id}': '{next_task_id}'")
 
         elif not condition_evaluated:
             if current_task.status == "completed":
@@ -526,3 +609,36 @@ class AsyncWorkflowEngine:
             "status": self.workflow.status,
             "tasks": {task_id: task.to_dict() for task_id, task in self.workflow.tasks.items()},
         }
+
+    async def run_workflow(self) -> bool:
+        """Runs the entire workflow by executing starting tasks and following transitions."""
+        log_workflow_start(self.workflow.id, self.workflow.name)
+        
+        # Start with workflow starting points
+        self.pending_tasks = self.workflow.get_starting_tasks()
+        
+        # Keep executing tasks while there are pending tasks
+        while self.pending_tasks:
+            # Get next task to execute
+            current_task = self.pending_tasks.pop(0)
+            
+            # Skip tasks already executed or in progress
+            if current_task.status in ["completed", "failed", "in_progress"]:
+                continue
+                
+            # Execute the current task
+            success = await self.async_execute_task(current_task)
+            
+            # Find and schedule next tasks based on result
+            await self.find_and_execute_next_tasks(current_task, success)
+        
+        # Check if workflow completed successfully (all tasks completed or terminal tasks reached)
+        workflow_success = all(task.status == "completed" for task in self.workflow.tasks.values() 
+                             if not task.is_optional)
+        
+        # Set workflow status
+        status = "completed" if workflow_success else "failed"
+        self.workflow.set_status(status)
+        log_workflow_end(self.workflow.id, self.workflow.name, status)
+        
+        return workflow_success

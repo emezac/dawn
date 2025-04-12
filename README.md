@@ -164,9 +164,14 @@ For more details, see the [Error Propagation documentation](docs/error_propagati
 ```python
 from core.task import DirectHandlerTask
 
-# Define a handler function
-def my_custom_handler(input_data):
+# Define a handler function with the new two-parameter format
+def my_custom_handler(task, input_data):
+    # Access task properties if needed
+    print(f"Executing task: {task.name} (ID: {task.id})")
+    
+    # Process the input data
     result = process_data(input_data["value"])
+    
     return {"success": True, "result": result}
 
 # Create a task with the direct handler
@@ -180,6 +185,8 @@ task = DirectHandlerTask(
 # Add to workflow
 workflow.add_task(task)
 ```
+
+> **Note:** DirectHandlerTask now supports both older single-parameter handlers (just `input_data`) and the new two-parameter format (`task, input_data`). The two-parameter format is recommended as it provides access to the task context.
 
 ### Services Container
 

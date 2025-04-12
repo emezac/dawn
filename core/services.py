@@ -9,6 +9,7 @@ from .tools.registry import ToolRegistry
 from .tools.registry_access import get_registry as get_tool_registry_singleton
 from .tools.registry_access import reset_registry as reset_tool_registry_singleton
 from .llm.interface import LLMInterface
+from .tools.handler_registry import HandlerRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ class ServicesContainer:
     def __init__(self):
         self._services: Dict[str, ServiceEntry[Any]] = {}
         self._initialized = False
+        self._tool_registry = None
+        self._handler_registry = None
+        self._llm_interfaces = {}
         logger.debug("ServicesContainer initialized.")
         
     def initialize(self) -> None:
@@ -52,6 +56,15 @@ class ServicesContainer:
             "tool_registry"
         )
         
+        # Initialize the handler registry if not already initialized
+        if self._handler_registry is None:
+            self._handler_registry = HandlerRegistry()
+            self.register_service(
+                self._handler_registry,
+                HandlerRegistry,
+                "handler_registry"
+            )
+        
         self._initialized = True
         logger.debug("ServicesContainer initialized with default services.")
 
@@ -62,7 +75,28 @@ class ServicesContainer:
         Initializes it on first access.
         """
         self.initialize()
-        return self.get_service(ToolRegistry)
+        if self._tool_registry is None:
+            self._tool_registry = ToolRegistry()
+        return self._tool_registry
+
+    @property
+    def handler_registry(self) -> HandlerRegistry:
+        """Get the global handler registry.
+        
+        Creates a new handler registry if one doesn't exist.
+        
+        Returns:
+            HandlerRegistry: The global handler registry
+        """
+        self.initialize()
+        if self._handler_registry is None:
+            self._handler_registry = HandlerRegistry()
+            self.register_service(
+                self._handler_registry,
+                HandlerRegistry,
+                "handler_registry"
+            )
+        return self._handler_registry
 
     def register_service(self, instance: T, service_type: Type[T], name: Optional[str] = None) -> None:
         """
@@ -179,45 +213,101 @@ class ServicesContainer:
         try:
             return self.get_service_typed(LLMInterface, name)
         except KeyError:
-            raise KeyError(f"No LLM interface registered with name '{name}'")
+            # If no LLM interface is registered, create a mock interface
+            from .llm.mock_interface import MockLLMInterface
+            llm_interface = MockLLMInterface()
+            self.register_llm_interface(llm_interface, name)
+            logger.warning(f"Created mock LLM interface with name '{name}'")
+            return llm_interface
     
     def reset(self) -> None:
         """
-        Reset all services in the container.
+        Reset the container, clearing all services.
+        Primarily used for testing.
         """
-        # Reset registered services that have reset methods
-        if self.has_service(ToolRegistry):
-            reset_tool_registry_singleton()
-            
-        # Clear the services dictionary
         self._services.clear()
+        self._tool_registry = None
+        self._handler_registry = None
+        self._llm_interfaces = {}
         self._initialized = False
+        
+        # Reset the global tool registry singleton
+        reset_tool_registry_singleton()
+        
         logger.debug("ServicesContainer reset.")
+    
+    def register_tool_registry(self, registry: ToolRegistry) -> None:
+        """
+        Register a custom tool registry.
+        
+        Args:
+            registry: The tool registry to register
+        """
+        self._tool_registry = registry
+        self.register_service(registry, ToolRegistry, "tool_registry")
+        logger.debug("Custom ToolRegistry registered.")
+        
+    def register_handler_registry(self, registry: HandlerRegistry) -> None:
+        """
+        Register a custom handler registry.
+        
+        Args:
+            registry: The handler registry to register
+        """
+        self._handler_registry = registry
+        self.register_service(registry, HandlerRegistry, "handler_registry")
+        logger.debug("Custom HandlerRegistry registered.")
+        
+    def create_workflow_engine(self, workflow):
+        """
+        Create a workflow engine with all necessary dependencies.
+        
+        Args:
+            workflow: The workflow to execute
+            
+        Returns:
+            A WorkflowEngine instance with all dependencies injected
+        """
+        from .workflow_engine import WorkflowEngine
+        return WorkflowEngine(
+            workflow=workflow,
+            llm_interface=self.get_llm_interface(),
+            tool_registry=self.tool_registry,
+            handler_registry=self.handler_registry
+        )
 
 
-# --- Global Access ---
-
-_global_services_instance: Optional[ServicesContainer] = None
+# Global singleton instance
+_services_instance = None
 
 def get_services() -> ServicesContainer:
     """
-    Provides access to the global singleton ServicesContainer instance.
+    Get the global services container instance.
     
     Returns:
         The global ServicesContainer instance
     """
-    global _global_services_instance
-    if _global_services_instance is None:
-        logger.debug("Creating global ServicesContainer instance.")
-        _global_services_instance = ServicesContainer()
-    return _global_services_instance
+    global _services_instance
+    if _services_instance is None:
+        _services_instance = ServicesContainer()
+    return _services_instance
 
 def reset_services() -> None:
     """
-    Resets the global services container. Primarily for testing.
+    Reset the global services container.
+    Primarily used for testing.
     """
-    global _global_services_instance
-    if _global_services_instance:
-        logger.debug("Resetting global ServicesContainer instance.")
-        _global_services_instance.reset()
-    _global_services_instance = None 
+    global _services_instance
+    if _services_instance is not None:
+        _services_instance.reset()
+    _services_instance = None
+    logger.debug("Global ServicesContainer reset.")
+    
+def get_handler_registry() -> HandlerRegistry:
+    """
+    Get the global handler registry instance.
+    
+    Returns:
+        The global HandlerRegistry instance
+    """
+    return get_services().handler_registry 

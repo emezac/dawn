@@ -5,7 +5,7 @@ This task generates a summary of a document using an LLM.
 """
 
 from typing import Dict, Any
-from core.workflow.task import Task
+from core.task import Task
 
 
 class SummarizeDocumentTask(Task):
@@ -17,6 +17,14 @@ class SummarizeDocumentTask(Task):
     2. Uses an LLM to generate a summary
     3. Returns the summary
     """  # noqa: D202
+    
+    def __init__(self):
+        """Initialize the task."""
+        super().__init__(
+            task_id="summarize_document", 
+            name="Summarize Document Task",
+            tool_name="openai"
+        )
     
     def execute(self, context):
         """

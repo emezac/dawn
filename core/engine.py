@@ -6,14 +6,16 @@ tasks in the correct order, handling dependencies, and managing execution.
 """
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 import time
 
 from core.llm.interface import LLMInterface
 from core.task import Task
 from core.tools.registry import ToolRegistry
+from core.task_execution_strategy import TaskExecutionStrategyFactory
 from core.utils.logger import (
     log_error,
+    log_info,
     log_task_end,
     log_task_input,
     log_task_output,
@@ -59,6 +61,67 @@ class WorkflowEngine:
         
         # Initialize error context for tracking errors across tasks
         self.error_context = ErrorContext(workflow_id=workflow.id)
+        
+        # Initialize strategy factory for task execution strategies
+        self.strategy_factory = TaskExecutionStrategyFactory(llm_interface, tool_registry)
+        
+        # Initialize the condition evaluation helper functions
+        self._condition_helper_funcs = {}
+        
+        # Keep essential init logs
+        log_info(f"WorkflowEngine initialized for workflow '{workflow.name}' (ID: {workflow.id})")
+        log_info(f"Using ToolRegistry instance {id(tool_registry)} with tools: {list(tool_registry.tools.keys())}")
+
+    def register_condition_helper(self, name: str, function: Callable) -> None:
+        """Register a helper function for use in condition evaluation.
+        
+        Args:
+            name: The name to use when calling the function from conditions
+            function: The function to register
+        """
+        if name in self._condition_helper_funcs:
+            log_info(f"Replacing existing condition helper function '{name}'")
+        self._condition_helper_funcs[name] = function
+        log_info(f"Registered condition helper function '{name}'")
+        
+    def _build_condition_context(self, task: Task) -> Dict[str, Any]:
+        """Build a context dictionary for condition evaluation with safe variable access.
+        
+        Args:
+            task: The task whose condition is being evaluated
+            
+        Returns:
+            A dictionary with variable bindings for condition evaluation
+        """
+        context = {
+            "output_data": task.output_data,  # Current task's output
+            "task": task,  # Current task object (for advanced conditions)
+            "workflow_id": self.workflow.id,  # Workflow ID
+            "workflow_name": self.workflow.name,  # Workflow name
+            "task_id": task.id,  # Current task ID (convenience)
+            "task_status": task.status,  # Current task status (convenience)
+        }
+        
+        # Add helper functions
+        for func_name, func in self._condition_helper_funcs.items():
+            context[func_name] = func
+            
+        # Add access to other task outputs with safety checks
+        task_outputs = {}
+        for task_id, other_task in self.workflow.tasks.items():
+            if other_task.status == "completed":
+                task_outputs[task_id] = other_task.output_data
+            else:
+                task_outputs[task_id] = None
+        context["task_outputs"] = task_outputs
+        
+        # Add workflow variables 
+        if hasattr(self.workflow, "variables") and isinstance(self.workflow.variables, dict):
+            context["workflow_vars"] = self.workflow.variables
+        else:
+            context["workflow_vars"] = {}
+            
+        return context
 
     def process_task_input(self, task: Task) -> Dict[str, Any]:
         """
@@ -137,8 +200,7 @@ class WorkflowEngine:
         """
         Execute a task and return whether it was successful.
 
-        This method handles different types of tasks including LLM tasks, tool tasks,
-        and DirectHandlerTasks.
+        This method handles different types of tasks using the strategy pattern.
 
         Args:
             task: The task to execute
@@ -153,34 +215,36 @@ class WorkflowEngine:
         processed_input = self.process_task_input(task)
         log_task_input(task.id, processed_input)
 
-        # Check if this is a DirectHandlerTask
-        if hasattr(task, "is_direct_handler") and task.is_direct_handler:
-            # Execute DirectHandlerTask directly using its execute method
-            result = task.execute(processed_input)
-        # Standard task execution based on type
-        elif task.is_llm_task:
-            result = self.execute_llm_task(task, processed_input)
-        else:
-            result = self.execute_tool_task(task, processed_input)
-
-        # Process the result
-        if result.get("success", False):
-            task.set_status("completed")
-            # Preserve the complete result structure in the output
-            # Make sure both 'result' and 'response' are available for backward compatibility
-            output_data = result.copy()
+        try:
+            # Get the appropriate strategy for the task
+            strategy = self.strategy_factory.get_strategy(task)
             
-            # Ensure at least one of result or response is set
-            if "result" in result and "response" not in result:
-                output_data["response"] = result["result"]
-            elif "response" in result and "result" not in result:
-                output_data["result"] = result["response"]
+            # Execute the task using the strategy
+            import asyncio
+            # Since the strategies are defined to work async, we need to run them in an event loop
+            execution_result = asyncio.run(strategy.execute(task, processed_input=processed_input))
+
+            if execution_result.get("success"):
+                task.set_status("completed")
+                output_key = "response" if task.is_llm_task else "result"
+                # Ensure we have a complete output with both result and response
+                output_data = execution_result.copy()
+                if "result" in execution_result and "response" not in execution_result:
+                    output_data["response"] = execution_result["result"]
+                elif "response" in execution_result and "result" not in execution_result:
+                    output_data["result"] = execution_result["response"]
                 
-            task.set_output(output_data)
-            log_task_end(task.id, task.name, "completed", self.workflow.id)
-            return True
-        else:
-            return self.handle_task_failure(task, result)
+                task.set_output(output_data)
+                log_task_end(task.id, task.name, "completed", self.workflow.id)
+                return True
+            else:
+                return self.handle_task_failure(task, execution_result)
+        except Exception as e:
+            log_error(
+                f"Unhandled exception during execution wrapper for task '{task.id}': {e}",
+                exc_info=True,
+            )
+            return self.handle_task_failure(task, {"error": f"Unhandled engine error: {str(e)}"})
 
     def execute_llm_task(self, task: Task, processed_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -288,36 +352,57 @@ class WorkflowEngine:
 
     def get_next_task_by_condition(self, current_task: Task) -> Optional[Task]:
         """
-        Get the next task based on the current task's status and an optional condition.
+        Determine the next task to execute based on the current task's condition or status.
+        
+        Args:
+            current_task: The current task that has completed execution
+            
+        Returns:
+            The next task to execute, or None if workflow should end
         """
-        next_task_id = None
-
-        if current_task.condition is not None:
+        if current_task.status == "completed" and current_task.condition:
+            # Evaluate condition to determine next task
             try:
-                # Pass a local context with 'output_data' to the eval function.
-                if eval(current_task.condition, {}, {"output_data": current_task.output_data}):
-                    next_task_id = current_task.next_task_id_on_success
-                else:
-                    next_task_id = current_task.next_task_id_on_failure
+                # Build a rich context for condition evaluation
+                eval_context = self._build_condition_context(current_task)
+                
+                # Create a restricted builtins dict with only safe operations
+                safe_builtins = {
+                    "True": True, "False": False, "None": None,
+                    "abs": abs, "all": all, "any": any, "bool": bool, 
+                    "dict": dict, "float": float, "int": int, "len": len,
+                    "list": list, "max": max, "min": min, "round": round,
+                    "sorted": sorted, "str": str, "sum": sum, "tuple": tuple,
+                    "type": type
+                }
+                
+                # Execute the condition with the prepared context
+                condition_met = bool(
+                    eval(
+                        current_task.condition,
+                        {"__builtins__": safe_builtins},
+                        eval_context
+                    )
+                )
+                log_info(f"Condition '{current_task.condition}' for task '{current_task.id}' evaluated to: {condition_met}")
+                
+                next_task_id = current_task.next_task_id_on_success if condition_met else current_task.next_task_id_on_failure
             except Exception as e:
-                # If evaluation fails, fall back to the success branch.
-                next_task_id = current_task.next_task_id_on_success
-        else:
-            if current_task.status == "completed" and current_task.next_task_id_on_success:
-                next_task_id = current_task.next_task_id_on_success
-            elif current_task.status == "failed" and current_task.next_task_id_on_failure:
+                log_error(f"Error evaluating condition for task {current_task.id}: {str(e)}. Defaulting to failure path.")
                 next_task_id = current_task.next_task_id_on_failure
-
-        if next_task_id is None:
-            return self.get_next_task()
-
-        if next_task_id in self.workflow.tasks:
-            try:
-                self.workflow.current_task_index = self.workflow.task_order.index(next_task_id)
-                return self.workflow.tasks[next_task_id]
-            except ValueError:
-                return None
-        return None
+        else:
+            # Use success/failure IDs based on task status
+            if current_task.status == "completed":
+                next_task_id = current_task.next_task_id_on_success
+            else:
+                next_task_id = current_task.next_task_id_on_failure
+        
+        # Get the next task if defined
+        if next_task_id:
+            return self.workflow.get_task(next_task_id)
+        else:
+            # End of workflow or branch
+            return None
 
     def get_next_task(self) -> Optional[Task]:
         if self.workflow.current_task_index >= len(self.workflow.task_order):

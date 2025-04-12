@@ -135,10 +135,10 @@ class TestTaskOutput(unittest.TestCase):
     
     def test_direct_handler_task_output(self):
         """Test output handling in DirectHandlerTask."""
-        def handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
+        def handler(task, input_data: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 "success": True,
-                "result": f"Processed: {input_data.get('value', 'unknown')}"
+                "result": f"Processed: {input_data.get('value', 'none')}"
             }
         
         task = DirectHandlerTask(
@@ -163,7 +163,7 @@ class TestTaskOutput(unittest.TestCase):
     
     def test_direct_handler_error_handling(self):
         """Test error handling in DirectHandlerTask."""
-        def error_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
+        def error_handler(task, input_data: Dict[str, Any]) -> Dict[str, Any]:
             # Handler that always raises an exception
             raise ValueError("Invalid input provided")
         
@@ -177,6 +177,12 @@ class TestTaskOutput(unittest.TestCase):
         # Execute the task (should catch the exception)
         result = task.execute()
         
+        # Debug print
+        print("\nDEBUG: test_direct_handler_error_handling result:", result)
+        print("DEBUG: success value =", result.get("success"))
+        print("DEBUG: error message =", result.get("error"))
+        print("DEBUG: error_type =", result.get("error_type"))
+        
         # Test that an error result is returned
         self.assertFalse(result["success"])
         self.assertIn("Handler execution failed: Invalid input provided", result["error"])
@@ -186,7 +192,7 @@ class TestTaskOutput(unittest.TestCase):
     def test_validation_in_direct_handler(self):
         """Test input and output validation in DirectHandlerTask."""
         # Simple dictionary-based handler (not using named parameters)
-        def dict_handler(input_data: Dict[str, Any]) -> Dict[str, Any]:
+        def dict_handler(task, input_data: Dict[str, Any]) -> Dict[str, Any]:
             message = input_data.get("message", "")
             count = input_data.get("count", 0)
             

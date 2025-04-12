@@ -2,6 +2,23 @@
 
 This document provides examples of common workflow patterns in the Dawn framework, including basic task sequences, parallel execution, conditional branching, and error handling strategies.
 
+## Task Dictionary Representation
+
+When working with tasks programmatically, they are represented as dictionaries. As of the latest updates, task dictionaries use the key `task_id` (not `id`):
+
+```python
+# Task representation in dictionary form
+task_dict = task.to_dict()
+
+# Access task ID with the 'task_id' key
+task_id = task_dict["task_id"]  # NOT task_dict["id"]
+
+# Example: Working with task dictionaries
+all_tasks = {task_id: task.to_dict() for task_id, task in workflow.tasks.items()}
+for task_id, task_data in all_tasks.items():
+    print(f"Task {task_id} status: {task_data['status']}")
+```
+
 ## Basic Sequential Workflow
 
 The simplest workflow pattern is a sequence of tasks that execute one after another:
