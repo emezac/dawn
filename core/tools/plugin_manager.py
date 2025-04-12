@@ -107,6 +107,50 @@ class PluginManager:
                     if alias not in self.plugins or reload:
                         self.plugins[alias] = plugin_instance
     
+    def load_plugins_from_namespace(self, namespace: str, options: dict) -> None:
+        """
+        Load plugins from a specific namespace.
+        
+        Args:
+            namespace: The namespace to load plugins from
+            options: Additional options for loading plugins
+            
+        Raises:
+            ValueError: If the namespace does not exist or is not a valid package
+        """
+        if not namespace or not isinstance(namespace, str):
+            raise ValueError(f"Invalid namespace: {namespace}")
+            
+        # Check if the namespace exists as a Python package
+        try:
+            # This will raise ImportError if the namespace doesn't exist
+            importlib.import_module(namespace)
+        except ImportError as e:
+            # Convert ImportError to ValueError with a clearer message
+            error_msg = f"Namespace '{namespace}' does not exist or is not a valid Python package: {str(e)}"
+            raise ValueError(error_msg) from e
+        except Exception as e:
+            # Handle other exceptions that might occur during import
+            error_msg = f"Error importing namespace '{namespace}': {str(e)}"
+            raise ValueError(error_msg) from e
+            
+        # Register the namespace if it's valid
+        self.register_plugin_namespace(namespace)
+        
+        # Discover and load plugins from this namespace
+        plugin_classes = self.discover_plugins(namespace)
+        
+        for plugin_class in plugin_classes:
+            plugin_instance = plugin_class()
+            tool_name = plugin_instance.tool_name
+            
+            self.plugins[tool_name] = plugin_instance
+            self.plugin_classes[tool_name] = plugin_class
+            
+            # Register aliases
+            for alias in plugin_instance.tool_aliases:
+                self.plugins[alias] = plugin_instance
+    
     def get_plugin(self, name: str) -> Optional[ToolPlugin]:
         """
         Get a plugin by name.

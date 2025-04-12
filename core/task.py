@@ -202,6 +202,15 @@ class Task:
     def __repr__(self) -> str:
         return f"Task(id={self.id}, name={self.name}, status={self.status})"
 
+    def set_tool_registry(self, tool_registry):
+        """
+        Set the tool registry for the task.
+        
+        Args:
+            tool_registry: Tool registry to use for tool executions
+        """
+        self.tool_registry = tool_registry
+
 
 class DirectHandlerTask(Task):
     """
@@ -350,3 +359,12 @@ class DirectHandlerTask(Task):
         base_dict["is_direct_handler"] = True
         base_dict["handler_name"] = self.handler.__name__ if hasattr(self.handler, "__name__") else "anonymous_function"
         return base_dict
+
+    def set_tool_registry(self, tool_registry):
+        """
+        Set the tool registry for the task.
+        
+        Args:
+            tool_registry: Tool registry to use for tool executions
+        """
+        self.tool_registry = tool_registry

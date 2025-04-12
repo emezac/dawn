@@ -53,7 +53,7 @@
   - Implement error codes and standardized error messages
   - [x] Add proper error propagation between tasks
 
-- [ ] **Improve exit code handling**
+- [x] **Improve exit code handling**
   - [x] Standardize exit code usage across all framework code
   - [x] Add wrapper for main functions to ensure consistent exit code behavior
   - [x] Create exit code documentation for framework users
@@ -61,9 +61,9 @@
 ### 4. Testing Infrastructure
 
 - [ ] **Create mock registry for testing**
-  - Implement a testing-specific registry that doesn't require real services
-  - Add testing utilities for workflows and tasks
-  - Support recording and replaying of tool execution for tests
+  - [x] Implement a testing-specific registry that doesn't require real services
+  - [X] Add testing utilities for workflows and tasks
+  - [X] Support recording and replaying of tool execution for tests
 
 - [ ] **Add integration test suite for workflows**
   - Create integration tests for core workflow features
@@ -130,6 +130,8 @@
 4. Standardize exit code usage across framework code ✅
 5. Add wrapper for main functions to ensure consistent exit code behavior ✅
 6. Create exit code documentation for framework users ✅
+7. Implement a testing-specific registry that doesn't require real services ✅
+8. Add testing utilities for workflows and tasks (in progress) ⏳
 
 ## DirectHandlerTask Implementation Proposal
 

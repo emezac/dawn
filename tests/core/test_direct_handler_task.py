@@ -249,8 +249,13 @@ class TestWorkflowEngineWithDirectHandler(unittest.TestCase):
         # Run the workflow
         result = self.engine.run()
 
-        # Verify the workflow completed successfully
-        self.assertEqual(result["status"], "completed")
+        # Verify the workflow completed successfully - using .value to get the raw string
+        if hasattr(result["status"], "value"):
+            # For enum values
+            self.assertEqual(result["status"].value, "completed")
+        else:
+            # For string values
+            self.assertEqual(result["status"], "completed")
 
         # Verify each task was executed and completed
         self.assertEqual(self.direct_task.status, "completed")

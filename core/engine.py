@@ -7,6 +7,7 @@ tasks in the correct order, handling dependencies, and managing execution.
 
 import re
 from typing import Any, Dict, Optional
+import time
 
 from core.llm.interface import LLMInterface
 from core.task import Task
@@ -373,3 +374,25 @@ class WorkflowEngine:
             "tasks": {task_id: task.to_dict() for task_id, task in self.workflow.tasks.items()},
             "error_summary": error_summary
         }
+
+    def execute(self, workflow=None, execution_context=None):
+        """
+        Execute the workflow (alias for run method).
+        
+        Args:
+            workflow: Optional workflow to execute (otherwise uses self.workflow)
+            execution_context: Optional execution context (otherwise uses self.execution_context)
+            
+        Returns:
+            Dictionary containing the result of the workflow execution
+        """
+        # If workflow is provided, update the instance
+        if workflow is not None:
+            self.workflow = workflow
+            
+        # If execution_context is provided, update the instance
+        if execution_context is not None:
+            self.execution_context = execution_context
+            
+        # Call the run method
+        return self.run()
