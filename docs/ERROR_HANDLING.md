@@ -1,492 +1,291 @@
-# Dawn Framework Error Handling Guide
+# Dawn Framework Error Handling and Response Format
 
-This guide explains the standardized approach to error handling within the Dawn framework.
+This document describes the standardized error handling and response format used throughout the Dawn framework.
 
-## Table of Contents
+## Response Format Standards
 
-1. [Overview](#overview)
-2. [Error Response Format](#error-response-format)
-3. [Success Response Format](#success-response-format)
-4. [Error Classes](#error-classes)
-5. [Error Codes](#error-codes)
-6. [Utility Functions](#utility-functions)
-7. [Best Practices](#best-practices)
-8. [Examples](#examples)
+All tools and operations in the Dawn framework use a standardized response format to ensure consistency and make error handling predictable.
 
-## Overview
-
-The Dawn framework provides a comprehensive error handling system designed to:
-
-- Standardize error reporting across the framework
-- Provide meaningful error messages with appropriate context
-- Categorize errors by type and severity
-- Enable proper error handling at each level of the application
-- Support debugging with optional stack traces
-- Ensure consistent responses for both successes and errors
-
-This system is implemented in the `core.errors` module, which provides error classes, utility functions, and standardized response formats.
-
-## Error Response Format
-
-All errors in the Dawn framework follow a consistent response format:
+### Success Response Format
 
 ```json
 {
-  "error": {
-    "code": 1000,
-    "type": "INVALID_INPUT",
-    "message": "Missing required field: username",
-    "details": {
-      "field": "username"
-    },
-    "trace": "..."  // Optional stack trace
+  "success": true,
+  "status": "success",
+  "result": <result_data>,
+  "response": <result_data>,  // Both fields included for backward compatibility
+  "timestamp": "2023-04-28T12:34:56.789Z",
+  "message": "Optional success message",  // Optional
+  "metadata": {  // Optional
+    "additional_info": "any value"
   }
 }
 ```
 
-This format includes:
-
-- **code**: A numeric error code from the `ErrorCode` enum
-- **type**: The string name of the error code
-- **message**: A human-readable error message
-- **details**: (Optional) Additional context about the error
-- **trace**: (Optional) Stack trace for debugging
-
-## Success Response Format
-
-For consistency, successful responses also follow a standardized format:
+### Error Response Format
 
 ```json
 {
-  "data": {
-    // Response data
-  },
-  "message": "Operation completed successfully",  // Optional
-  "metadata": {
-    // Optional metadata
+  "success": false,
+  "status": "error",
+  "error": "Human-readable error message",
+  "error_code": "ERROR_CATEGORY_CODE",
+  "timestamp": "2023-04-28T12:34:56.789Z",
+  "error_details": {  // Optional
+    "field_name": "The field that caused the error",
+    "expected_type": "Expected data type",
+    "received_value": "Value that was received"
   }
 }
 ```
 
-This format includes:
+### Warning Response Format
 
-- **data**: The main response data
-- **message**: (Optional) A human-readable success message
-- **metadata**: (Optional) Additional metadata about the response
-
-## Error Classes
-
-The framework provides a hierarchy of error classes for different types of errors:
-
-```
-DawnError (base class)
-├── InputValidationError
-├── ResourceError
-├── ServiceError
-├── ToolError
-├── TaskError
-└── WorkflowError
+```json
+{
+  "success": true,
+  "status": "warning",
+  "result": <result_data>,
+  "response": <result_data>,  // Both fields included for backward compatibility
+  "warning": "Human-readable warning message",
+  "timestamp": "2023-04-28T12:34:56.789Z",
+  "warning_code": "WARNING_CODE",  // Optional
+  "warning_details": {  // Optional
+    "additional_info": "any value"
+  }
+}
 ```
 
-### DawnError
+## Implementation Details
 
-Base class for all errors in the Dawn framework.
+### 1. Core Error Classes
 
-```python
-class DawnError(Exception):
-    def __init__(
-        self,
-        message: str,
-        details: Optional[Dict[str, Any]] = None,
-        error_code: ErrorCode = ErrorCode.UNEXPECTED_ERROR
-    ):
-        # ...
-    
-    def to_response(self) -> Dict[str, Any]:
-        # ...
-```
+The [`core/errors.py`](../core/errors.py) module defines:
 
-### InputValidationError
+- `DawnError` - Base exception class for all Dawn framework errors
+- Specialized error classes (`ValidationError`, `ExecutionError`, etc.)
+- Standard error codes organized by category
+- Utility functions for creating standardized responses
 
-Used for validation errors when input data doesn't meet requirements.
+### 2. Response Format Utilities
 
-```python
-class InputValidationError(DawnError):
-    def __init__(
-        self,
-        message: str,
-        details: Optional[Dict[str, Any]] = None,
-        error_code: ErrorCode = ErrorCode.INVALID_INPUT
-    ):
-        # ...
-```
+The [`core/tools/response_format.py`](../core/tools/response_format.py) module provides:
 
-### ResourceError
+- `format_tool_response()` - Formats any tool result into the standard format
+- `standardize_tool_response` decorator - Wraps tool functions to ensure standard responses
+- `validate_tool_input` decorator - Validates tool inputs against a schema
 
-Used for errors related to resources like files, databases, etc.
+### 3. ToolRegistry with Standardized Responses
 
-```python
-class ResourceError(DawnError):
-    def __init__(
-        self,
-        message: str,
-        details: Optional[Dict[str, Any]] = None,
-        error_code: ErrorCode = ErrorCode.RESOURCE_NOT_FOUND
-    ):
-        # ...
-```
+The [`core/tools/registry.py`](../core/tools/registry.py) uses:
 
-### ServiceError
+- Consistent error handling for all tool executions
+- Support for various function signatures (no args, single arg, kwargs, etc.)
+- Auto-conversion of tool results to standardized format
 
-Used for errors related to external services and APIs.
+### 4. Backward Compatibility
 
-```python
-class ServiceError(DawnError):
-    def __init__(
-        self,
-        message: str,
-        details: Optional[Dict[str, Any]] = None,
-        error_code: ErrorCode = ErrorCode.SERVICE_ERROR
-    ):
-        # ...
-```
+To ensure backward compatibility, we've implemented these features:
 
-### ToolError
+- Both `result` and `response` fields are included in all success responses
+- Tools can return either field, and both will be available to consumers
+- Legacy error handling formats are automatically upgraded to the new format
 
-Used for errors related to tool execution.
+## How to Use
 
-```python
-class ToolError(DawnError):
-    def __init__(
-        self,
-        message: str,
-        details: Optional[Dict[str, Any]] = None,
-        error_code: ErrorCode = ErrorCode.TOOL_EXECUTION_ERROR
-    ):
-        # ...
-```
+### For Tool Developers
 
-### TaskError
+When creating new tools, you can:
 
-Used for errors related to task execution.
+1. Return the raw result and let the framework wrap it:
+   ```python
+   def my_tool(data):
+       return "Hello, world!"  # Will be wrapped as {"success": true, "result": "Hello, world!", ...}
+   ```
 
-```python
-class TaskError(DawnError):
-    def __init__(
-        self,
-        message: str,
-        details: Optional[Dict[str, Any]] = None,
-        error_code: ErrorCode = ErrorCode.TASK_EXECUTION_ERROR
-    ):
-        # ...
-```
+2. Return a partial response and let the framework complete it:
+   ```python
+   def my_tool(data):
+       return {"result": "Hello, world!"}  # Will be enhanced with success, timestamp, etc.
+   ```
 
-### WorkflowError
+3. Return a complete standardized response:
+   ```python
+   def my_tool(data):
+       return {
+           "success": True,
+           "result": "Hello, world!",
+           "response": "Hello, world!",
+           "status": "success",
+           "timestamp": datetime.now().isoformat()
+       }
+   ```
 
-Used for errors related to workflow execution.
+4. Use the decorators for automatic formatting:
+   ```python
+   @standardize_tool_response
+   def my_tool(data):
+       return "Hello, world!"
+   ```
 
-```python
-class WorkflowError(DawnError):
-    def __init__(
-        self,
-        message: str,
-        details: Optional[Dict[str, Any]] = None,
-        error_code: ErrorCode = ErrorCode.WORKFLOW_EXECUTION_ERROR
-    ):
-        # ...
-```
+### For Tool Consumers
+
+When using tools, you can expect:
+
+1. Consistent response format across all tools
+2. Both `result` and `response` fields available for backward compatibility
+3. Standard error handling with error codes and detailed information
+
+See the [Migrating Tools](migrating_tools.md) guide for more information on updating existing tools to use the new format.
 
 ## Error Codes
 
-Error codes are organized by category, with each category having a dedicated range:
+Error codes in the Dawn framework follow a standardized format:
 
-- **1000-1999**: Input validation errors
-- **2000-2999**: Resource errors
-- **3000-3999**: Service errors
-- **4000-4999**: Tool errors
-- **5000-5999**: Task errors
-- **6000-6999**: Workflow errors
-- **9000-9999**: Generic errors
-
-Example error codes:
-
-```python
-class ErrorCode(Enum):
-    # Input validation errors (1000-1999)
-    INVALID_INPUT = 1000
-    MISSING_REQUIRED_FIELD = 1001
-    INVALID_FORMAT = 1002
-    
-    # Resource errors (2000-2999)
-    RESOURCE_NOT_FOUND = 2000
-    RESOURCE_ALREADY_EXISTS = 2001
-    RESOURCE_ACCESS_DENIED = 2002
-    
-    # Service errors (3000-3999)
-    SERVICE_UNAVAILABLE = 3000
-    SERVICE_TIMEOUT = 3001
-    SERVICE_ERROR = 3002
-    RATE_LIMIT_EXCEEDED = 3003
-    
-    # ...and more
+```
+<CATEGORY>_<DESCRIPTION>_<NUMBER>
 ```
 
-## Utility Functions
+For example: `VALIDATION_MISSING_FIELD_101`
 
-The framework provides utility functions for creating and checking responses:
+### Error Categories
 
-### create_error_response
+- **VALIDATION** (100-199): Input/output validation errors
+- **EXECUTION** (200-299): Errors during task/tool execution
+- **AUTH** (300-399): Authentication/authorization errors
+- **CONNECTION** (400-499): Network/connection errors
+- **RESOURCE** (500-599): Resource-related errors (not found, access denied)
+- **FRAMEWORK** (600-699): Framework internal errors
+- **PLUGIN** (700-799): Errors in plugin system
+- **UNKNOWN** (900-999): Uncategorized errors
 
-Creates a standardized error response.
+## Exception Classes
 
-```python
-def create_error_response(
-    code: ErrorCode,
-    message: str,
-    details: Optional[Dict[str, Any]] = None,
-    trace: Optional[str] = None
-) -> Dict[str, Any]:
-    # ...
-```
+The framework provides specialized exception classes for different error types:
 
-### create_success_response
+- `DawnError`: Base exception class for all framework errors
+- `ValidationError`: For input validation errors
+- `ExecutionError`: For errors during task/tool execution
+- `ConnectionError`: For network-related errors
+- `ResourceError`: For resource access errors
 
-Creates a standardized success response.
+## Using the Error Handling System
 
-```python
-def create_success_response(
-    data: Any,
-    message: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    # ...
-```
-
-### is_error_response
-
-Checks if a response is an error response.
+### Creating Standard Responses
 
 ```python
-def is_error_response(response: Dict[str, Any]) -> bool:
-    # ...
-```
+from core.errors import create_error_response, create_success_response, create_warning_response, ErrorCode
 
-### is_success_response
+# Create a success response
+response = create_success_response(
+    result={"key": "value"},
+    message="Operation completed successfully",
+    metadata={"operation_id": "123"}
+)
 
-Checks if a response is a success response.
+# Create an error response
+response = create_error_response(
+    message="Required field 'username' is missing",
+    error_code=ErrorCode.VALIDATION_MISSING_FIELD,
+    details={"field_name": "username"}
+)
 
-```python
-def is_success_response(response: Dict[str, Any]) -> bool:
-    # ...
-```
-
-### safe_execute
-
-Executes a function and handles any exceptions, returning either the result or an error response.
-
-```python
-def safe_execute(func: Callable[..., T], *args, **kwargs) -> Union[T, Dict[str, Any]]:
-    # ...
-```
-
-## Best Practices
-
-### When to Raise vs When to Return Errors
-
-1. **Raise exceptions** when:
-   - The error should interrupt the normal flow of execution
-   - The caller is expected to handle the exception
-   - Working within a function where exceptions will be caught and handled by a higher level
-
-2. **Return error responses** when:
-   - The function is a service or API endpoint
-   - The caller expects a response object (success or error)
-   - The error doesn't need to interrupt execution flow
-
-### Designing Error Messages
-
-1. **Be specific**: Clearly describe what went wrong
-2. **Be actionable**: Hint at what the user can do to fix the issue
-3. **Provide context**: Include relevant details about the error state
-4. **Avoid technical jargon** in user-facing messages
-5. **Use consistent terminology** throughout error messages
-
-### Adding Error Details
-
-Use the `details` dictionary to provide additional context:
-
-```python
-raise InputValidationError(
-    "Invalid email format",
-    details={
-        "field": "email",
-        "value": input_email,
-        "pattern": EMAIL_PATTERN
-    }
+# Create a warning response
+response = create_warning_response(
+    result={"partial_data": "value"},
+    warning="Some records could not be processed",
+    warning_code="PARTIAL_PROCESSING",
+    details={"processed": 8, "failed": 2}
 )
 ```
 
-### Error Handling in Components
+### Making Tool Handlers Comply with Standard Format
 
-#### In Tools
+Tool handlers can be decorated with the `standardize_tool_response` decorator to ensure they return responses in the standard format:
 
 ```python
-def execute(self, data):
-    # Validate input first
-    validation_error = self.validate_input(data)
-    if validation_error:
-        return validation_error.to_response()
-    
+from core.tools.response_format import standardize_tool_response
+
+@standardize_tool_response
+def my_tool_handler(input_data):
+    # Your tool implementation
+    return result
+```
+
+Or you can manually ensure compliance by using the formatting utilities:
+
+```python
+from core.tools.response_format import format_tool_response
+
+def my_tool_handler(input_data):
     try:
-        # Process the request
-        result = self.process(data)
-        return create_success_response(result)
-    except DawnError as e:
-        return e.to_response()
+        # Your tool implementation
+        result = do_something()
+        return format_tool_response(result)
     except Exception as e:
         return create_error_response(
-            ErrorCode.UNEXPECTED_ERROR,
-            str(e),
-            {"exception_type": type(e).__name__}
+            message=f"Tool execution failed: {str(e)}",
+            error_code=ErrorCode.EXECUTION_TOOL_FAILED,
+            details={"error_type": type(e).__name__}
         )
 ```
 
-#### In Tasks
+### Input Validation
+
+For tools that require input validation, you can use the `validate_tool_input` decorator:
 
 ```python
-def execute_task(self):
-    try:
-        # Execute the task
-        result = self.do_work()
-        return create_success_response(result)
-    except DawnError as e:
-        log_error(f"Task error: {e.message}")
-        return e.to_response()
-    except Exception as e:
-        log_error(f"Unexpected error: {str(e)}", exc_info=True)
-        return create_error_response(
-            ErrorCode.TASK_EXECUTION_ERROR,
-            f"Task failed: {str(e)}",
-            {"exception_type": type(e).__name__}
-        )
+from core.tools.response_format import validate_tool_input
+
+@validate_tool_input(
+    schema={
+        "query": {"type": str},
+        "max_results": {"type": int}
+    },
+    required_fields=["query"]
+)
+def search_tool_handler(input_data):
+    # If we get here, validation passed
+    query = input_data["query"]
+    max_results = input_data.get("max_results", 10)
+    # ... implementation ...
+    return result
 ```
 
-#### In Workflows
+## Exit Code Handling
 
-Use aggregated error handling for multiple task results:
+For applications or scripts using Dawn, standard exit codes are provided:
+
+- `0`: Success
+- `1`: General Error
+- `2-4`: Configuration Errors
+- `5-7`: Resource Errors
+- `10-11`: Workflow Errors
+- `20-22`: Connection Errors
+- `30-32`: User Input Errors
+- `40-41`: Internal Errors
+
+The `main_wrapper` decorator can be used to handle exceptions and return appropriate exit codes:
 
 ```python
-results = []
-error_count = 0
+from core.errors import main_wrapper
 
-for task in tasks:
-    result = task.execute()
-    results.append(result)
-    if is_error_response(result):
-        error_count += 1
+@main_wrapper
+def main():
+    # Your main function
+    # Any exceptions will be caught and translated to appropriate exit codes
+    pass
 
-if error_count == len(tasks):
-    return create_error_response(
-        ErrorCode.WORKFLOW_EXECUTION_ERROR,
-        "Workflow failed: all tasks failed",
-        {"total_tasks": len(tasks), "failed_tasks": error_count}
-    )
-elif error_count > 0:
-    return create_success_response(
-        {"results": results},
-        message="Workflow completed with some errors",
-        metadata={"total_tasks": len(tasks), "failed_tasks": error_count}
-    )
-else:
-    return create_success_response(
-        {"results": results},
-        message="Workflow completed successfully"
-    )
+if __name__ == "__main__":
+    exit_code = main()
+    sys.exit(exit_code)
 ```
 
-## Examples
+## Adding New Error Codes
 
-### Basic Error Handling
+When adding new error codes to the framework, follow these guidelines:
 
-```python
-from core.errors import InputValidationError, create_error_response, ErrorCode
-
-def validate_user_data(user_data):
-    if "username" not in user_data:
-        return create_error_response(
-            ErrorCode.MISSING_REQUIRED_FIELD,
-            "Missing required field: username",
-            {"field": "username"}
-        )
-    
-    if len(user_data["username"]) < 3:
-        return create_error_response(
-            ErrorCode.INVALID_INPUT,
-            "Username must be at least 3 characters long",
-            {"field": "username", "min_length": 3, "actual_length": len(user_data["username"])}
-        )
-    
-    return None  # No error
-```
-
-### Using Error Classes
-
-```python
-from core.errors import InputValidationError, ErrorCode
-
-def validate_user_data(user_data):
-    if "username" not in user_data:
-        raise InputValidationError(
-            "Missing required field: username",
-            {"field": "username"},
-            ErrorCode.MISSING_REQUIRED_FIELD
-        )
-    
-    if len(user_data["username"]) < 3:
-        raise InputValidationError(
-            "Username must be at least 3 characters long",
-            {"field": "username", "min_length": 3, "actual_length": len(user_data["username"])}
-        )
-```
-
-### Handling Errors in API Endpoints
-
-```python
-from core.errors import DawnError, create_success_response, create_error_response, ErrorCode
-
-def user_api_endpoint(request_data):
-    try:
-        # Validate the request
-        validation_error = validate_user_data(request_data)
-        if validation_error:
-            return validation_error
-        
-        # Process the request
-        user = create_user(request_data)
-        return create_success_response(
-            {"user_id": user.id, "username": user.username},
-            message="User created successfully"
-        )
-    except DawnError as e:
-        return e.to_response()
-    except Exception as e:
-        return create_error_response(
-            ErrorCode.UNEXPECTED_ERROR,
-            str(e),
-            {"exception_type": type(e).__name__}
-        )
-```
-
-### Using safe_execute
-
-```python
-from core.errors import safe_execute
-
-def api_endpoint(request_data):
-    result = safe_execute(process_request, request_data)
-    return result  # Either the result or an error response
-```
-
-### Complete Tool Example
-
-See the [complete example](../examples/error_handling_example.py) for a detailed implementation of error handling in a tool and task. 
+1. Add the error code to the appropriate category in `core.errors.ErrorCode`
+2. Use the standard naming format: `CATEGORY_DESCRIPTION_NUMBER`
+3. Use the next available number in the category's range
+4. Document the error code and its meaning 
