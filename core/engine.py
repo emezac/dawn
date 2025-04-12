@@ -16,6 +16,7 @@ from core.task_execution_strategy import TaskExecutionStrategyFactory
 from core.utils.logger import (
     log_error,
     log_info,
+    log_warning,
     log_task_end,
     log_task_input,
     log_task_output,
@@ -133,7 +134,9 @@ class WorkflowEngine:
         Returns:
             Processed input data with resolved references
         """
-        processed_input = task.input_data.copy() if task.input_data else {}
+        original_input = task.input_data.copy() if task.input_data else {}
+        processed_input = original_input.copy()
+        log_info(f"[PROCESS_INPUT:{task.id}] Original input: {original_input}")
         
         # Get all tasks that might be referenced
         completed_tasks = {
@@ -142,14 +145,19 @@ class WorkflowEngine:
         }
         
         if not completed_tasks:
+            log_info(f"[PROCESS_INPUT:{task.id}] No completed tasks to reference.")
             return processed_input
-            
+        
         # Process string values that might contain references
-        for key, value in processed_input.items():
+        for key, value in original_input.items(): # Iterate over original to avoid modifying during iteration
             if isinstance(value, str) and "${" in value:
+                log_info(f"[PROCESS_INPUT:{task.id}] Found potential reference in key '{key}': {value}")
                 # Look for references to task outputs
                 matches = re.findall(r"\${([^}]+)}", value)
+                current_value_in_processed = processed_input[key]
+                replaced_something = False
                 for match in matches:
+                    log_info(f"[PROCESS_INPUT:{task.id}] Evaluating match: {match}")
                     # Check if this is an error reference
                     if match.startswith("error."):
                         # Extract the task ID and error path
@@ -169,31 +177,61 @@ class WorkflowEngine:
                                 if error_value is not None:
                                     if value == f"${{{match}}}":
                                         processed_input[key] = error_value
+                                        replaced_something = True
                                         break
                                     processed_input[key] = value.replace(f"${{{match}}}", str(error_value))
                     else:
                         # Standard task output reference
                         parts = match.split(".")
                         ref_task_id = parts[0]
+                        log_info(f"[PROCESS_INPUT:{task.id}] Referenced task ID: {ref_task_id}")
                         
                         if ref_task_id in completed_tasks:
                             ref_task = completed_tasks[ref_task_id]
+                            log_info(f"[PROCESS_INPUT:{task.id}] Found ref_task '{ref_task_id}' with status '{ref_task.status}'")
                             # Extract the referenced field from the task output
                             field = ".".join(parts[1:]) if len(parts) > 1 else None
+                            log_info(f"[PROCESS_INPUT:{task.id}] Referenced field: {field}")
                             try:
                                 if field:
-                                    replacement = ref_task.get_output_value(field)
+                                    # Check if the field is specifically 'output_data'
+                                    if field == 'output_data':
+                                        replacement = ref_task.output_data
+                                    else:
+                                        replacement = ref_task.get_output_value(field)
                                 else:
-                                    replacement = ref_task.get_output_value()
-                                    
+                                    # Default to getting the full 'result' or 'response' if no field specified
+                                    replacement = ref_task.get_output_value("result") # Prioritize result
+                                    if replacement is None:
+                                        replacement = ref_task.get_output_value("response") # Fallback to response
+                                
+                                log_info(f"[PROCESS_INPUT:{task.id}] Resolved value for '{match}': {type(replacement)} {str(replacement)[:100]}...")
+                                
                                 if replacement is not None:
-                                    if value == f"${{{match}}}":
+                                    # Check if the entire value is the variable
+                                    if current_value_in_processed == f"${{{match}}}":
+                                        log_info(f"[PROCESS_INPUT:{task.id}] Replacing entire value for key '{key}'")
                                         processed_input[key] = replacement
-                                        break
-                                    processed_input[key] = value.replace(f"${{{match}}}", str(replacement))
+                                        replaced_something = True
+                                        # Since the entire value was replaced, break from inner loop for this key
+                                        break 
+                                    else:
+                                        # Replace the variable within the string
+                                        log_info(f"[PROCESS_INPUT:{task.id}] Replacing substring for key '{key}'")
+                                        processed_input[key] = current_value_in_processed.replace(f"${{{match}}}", str(replacement))
+                                        # Update current_value_in_processed for potential further replacements in the same string
+                                        current_value_in_processed = processed_input[key]
+                                        replaced_something = True
+                                else:
+                                     log_warning(f"[PROCESS_INPUT:{task.id}] Resolved value for '{match}' was None.")
                             except Exception as e:
-                                log_error(f"Error resolving reference ${{{match}}}: {str(e)}")
+                                log_error(f"[PROCESS_INPUT:{task.id}] Error resolving reference ${{{match}}}: {str(e)}")
+                        else:
+                             log_warning(f"[PROCESS_INPUT:{task.id}] Referenced task '{ref_task_id}' not found or not completed/failed.")
+            else:
+                 log_info(f"[PROCESS_INPUT:{task.id}] Key '{key}' is not a string or doesn't contain '${{'")
         
+        log_info(f"[PROCESS_INPUT:{task.id}] Final processed input: {processed_input}")
         return processed_input
 
     def execute_task(self, task: Task) -> bool:
@@ -397,9 +435,14 @@ class WorkflowEngine:
             else:
                 next_task_id = current_task.next_task_id_on_failure
         
-        # Get the next task if defined
+        # Get the next task if defined - safely access tasks dictionary
         if next_task_id:
-            return self.workflow.get_task(next_task_id)
+            # First try using get_task method if it exists
+            if hasattr(self.workflow, "get_task") and callable(getattr(self.workflow, "get_task")):
+                return self.workflow.get_task(next_task_id)
+            # Otherwise access the tasks dictionary directly
+            else:
+                return self.workflow.tasks.get(next_task_id)
         else:
             # End of workflow or branch
             return None

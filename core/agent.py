@@ -97,10 +97,24 @@ class Agent:
         )
         try:
             self.last_results = engine.run()
+        except AttributeError as e:
+            # Handle cases where workflow doesn't have an expected attribute
+            if "'Workflow' object has no attribute 'set_error'" in str(e):
+                log_error(f"Error running synchronous workflow {self.workflow.id}: {e}")
+                # Create a basic error result without using workflow.set_error
+                self.workflow.status = "failed"  # Set status directly
+                self.last_results = self._format_error_results(e)
+            else:
+                # Re-raise other AttributeError exceptions
+                raise
         except Exception as e:
             log_error(f"Error running synchronous workflow {self.workflow.id}: {e}")
-            if self.workflow:
-                self.workflow.set_status("failed")
+            try:
+                if self.workflow:
+                    self.workflow.set_status("failed")
+            except AttributeError:
+                # Direct attribute access if set_status is not available
+                self.workflow.status = "failed"
             self.last_results = self._format_error_results(e)
         return self.last_results
 

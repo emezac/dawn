@@ -10,7 +10,7 @@
         "status": "error",
         "error": "Resource 'tool' with ID 'file_system' not found",
         "error_code": "RESOURCE_NOT_FOUND_501",
-        "timestamp": "2025-04-12T00:37:36.094605",
+        "timestamp": "2025-04-12T02:04:00.646727",
         "error_details": {
           "resource_type": "tool",
           "resource_id": "file_system"

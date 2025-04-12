@@ -142,22 +142,16 @@ class DirectHandlerTaskExecutionStrategy(TaskExecutionStrategy):
         # Check if task has direct access to a handler function
         if hasattr(task, "handler") and callable(task.handler):
             try:
-                # Execute the handler directly using the task's execute method if available
+                # Execute the handler directly using the task's execute method
                 if hasattr(task, "execute") and callable(task.execute):
+                    log_info(f"Executing direct handler task '{task.id}' with handler: {getattr(task, 'handler_name', 'unnamed')}")
                     result = task.execute(processed_input)
                     return result
                 
-                # Fall back to direct handler execution
-                import inspect
-                handler_sig = inspect.signature(task.handler)
+                # Fall back to simple handler invocation if task doesn't have execute method
+                log_error(f"Task '{task.id}' has a handler but no execute method, using simple invocation")
+                result = task.handler(processed_input)
                 
-                if len(handler_sig.parameters) == 1:
-                    # Handler takes only input_data
-                    result = task.handler(processed_input)
-                else:
-                    # Handler takes both task and input_data
-                    result = task.handler(task, processed_input)
-                    
                 # Ensure proper result format
                 if isinstance(result, dict) and "success" in result:
                     return result
@@ -165,13 +159,15 @@ class DirectHandlerTaskExecutionStrategy(TaskExecutionStrategy):
                     return {"success": True, "result": result}
             except Exception as e:
                 log_error(f"Exception during execution of direct handler task '{task.id}': {e}", exc_info=True)
-                return {"success": False, "error": f"Execution error: {str(e)}"}
+                task.set_status("failed")
+                return {"success": False, "error": f"Handler execution failed: {str(e)}"}
         
         # If task has a handler_name and we have a handler registry, look up the handler
         elif hasattr(task, "handler_name") and self.handler_registry:
             try:
                 # Look up handler by name
                 handler_name = task.handler_name
+                log_info(f"Executing direct handler task '{task.id}' with registered handler: {handler_name}")
                 
                 # Execute handler via handler registry
                 result = await asyncio.to_thread(
@@ -180,16 +176,25 @@ class DirectHandlerTaskExecutionStrategy(TaskExecutionStrategy):
                     processed_input
                 )
                 
+                # Update task status based on result
+                if isinstance(result, dict) and result.get("success", True):
+                    task.set_status("completed")
+                else:
+                    task.set_status("failed")
+                
+                # Return standardized result
                 if isinstance(result, dict) and "success" in result:
                     return result
                 else:
                     return {"success": True, "result": result}
             except Exception as e:
                 log_error(f"Exception during execution of handler '{task.handler_name}' for task '{task.id}': {e}", exc_info=True)
-                return {"success": False, "error": f"Handler execution error: {str(e)}"}
+                task.set_status("failed")
+                return {"success": False, "error": f"Handler execution failed: {str(e)}"}
         
         else:
             log_error(f"No callable handler or handler_name found for direct handler task '{task.id}'.")
+            task.set_status("failed")
             return {"success": False, "error": "No callable handler found"}
 
 

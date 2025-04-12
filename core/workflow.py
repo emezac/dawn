@@ -125,7 +125,7 @@ class Workflow:
                 if task.status == "failed"
             ]
 
-    def set_error(self, error_message: str, error_code: str = None) -> None:
+    def set_error(self, error_message: str, error_code: Optional[str] = None) -> None:
         """
         Set workflow error information.
         
@@ -135,7 +135,13 @@ class Workflow:
         """
         self.status = "failed"
         self.error = error_message
-        self.error_code = error_code
+        
+        # Store error code if provided
+        if error_code is not None:
+            self.error_code = error_code
+        
+        # Log the error
+        print(f"Workflow '{self.id}' error: {error_message}")
 
     def is_completed(self) -> bool:
         """

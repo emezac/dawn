@@ -232,6 +232,76 @@ class TestTaskOutput(unittest.TestCase):
         task_dict = task.to_dict()
         self.assertEqual(task_dict["status"], "skipped")
 
+    def test_task_output_valid_direct_handler(self):
+        """Test valid output from a DirectHandlerTask."""
+        # Create a handler that returns a valid output
+        def valid_handler(data):
+            return {"success": True, "result": {"key": "value"}}
+
+        # Create a task with the valid handler
+        task = DirectHandlerTask(task_id="valid_task", name="Valid Task", handler=valid_handler)
+
+        # Execute the task
+        output = task.execute()
+
+        # Check that the output is as expected
+        self.assertTrue(output["success"])
+        self.assertEqual(output["result"], {"key": "value"})
+        self.assertEqual(task.status, "completed")
+
+    def test_task_output_invalid_direct_handler(self):
+        """Test invalid output from a DirectHandlerTask."""
+        # Create a handler that returns an invalid output (non-dict)
+        def invalid_handler(data):
+            return "This is not a dict"
+
+        # Create a task with the invalid handler
+        task = DirectHandlerTask(task_id="invalid_task", name="Invalid Task", handler=invalid_handler)
+
+        # Execute the task
+        output = task.execute()
+
+        # Check that the task handles the invalid output
+        self.assertFalse(output["success"])
+        self.assertIn("non-dict value", output["error"])
+        self.assertEqual(task.status, "failed")
+
+    def test_task_output_error_direct_handler(self):
+        """Test error output from a DirectHandlerTask."""
+        # Create a handler that raises an exception
+        def error_handler(data):
+            raise ValueError("Test error")
+
+        # Create a task with the error handler
+        task = DirectHandlerTask(task_id="error_task", name="Error Task", handler=error_handler)
+
+        # Execute the task
+        output = task.execute()
+
+        # Check that the task handles the error
+        self.assertFalse(output["success"])
+        self.assertIn("Test error", output["error"])
+        self.assertEqual(output["error_type"], "ValueError")
+        self.assertEqual(task.status, "failed")
+
+    def test_task_output_custom_error_direct_handler(self):
+        """Test custom error output from a DirectHandlerTask."""
+        # Create a handler that returns a custom error
+        def custom_error_handler(data):
+            return {"success": False, "error": "Custom error message", "error_type": "CustomError"}
+
+        # Create a task with the custom error handler
+        task = DirectHandlerTask(task_id="custom_error_task", name="Custom Error Task", handler=custom_error_handler)
+
+        # Execute the task
+        output = task.execute()
+
+        # Check that the task handles the custom error
+        self.assertFalse(output["success"])
+        self.assertEqual(output["error"], "Custom error message")
+        self.assertEqual(output["error_type"], "CustomError")
+        self.assertEqual(task.status, "failed")
+
 
 if __name__ == "__main__":
     unittest.main() 

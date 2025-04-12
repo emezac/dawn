@@ -297,87 +297,114 @@ class DirectHandlerTask(Task):
         if handler is not None and handler_name is None:
             self.handler_name = handler.__name__
 
-    def execute(self, processed_input: Optional[Dict[str, Any]] = None, workflow_variables=None, **kwargs):
-        """Execute the handler function with the task input.
+    def execute(self, processed_input: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Execute the direct handler task.
         
         Args:
-            processed_input: Optional processed input data. If not provided,
-                           the task's current input_data will be used.
-            workflow_variables: Variables from the workflow that can be referenced in input
-            **kwargs: Additional execution parameters
+            processed_input: Optional dictionary of processed input parameters.
+                             If None or empty, the task's own input_data will be used.
             
         Returns:
-            Dict with the result of the handler execution, containing at least:
-            - success: bool indicating if the execution was successful
-            - result/response: The output data of the handler
-            - error: Error message if execution failed (optional)
+            Dictionary containing the result of the execution
         """
-        # Determine which input to use (processed_input takes precedence over task.input_data)
-        input_to_use = processed_input if processed_input is not None else self.input_data
-        
-        # Apply variable resolution if workflow_variables are provided
-        if workflow_variables and not processed_input:
-            try:
-                from core.variable_resolver import resolve_variables
-                input_to_use = resolve_variables(input_to_use, workflow_variables)
-            except ImportError:
-                # If the resolver module isn't available, just use the input as is
-                pass
-        
+        # Determine the input to use:
+        # Prioritize processed_input if provided by the engine.
+        # Fallback to the task's own input_data if processed_input is None or empty.
+        if processed_input:
+            input_to_use = processed_input
+        else:
+            input_to_use = self.input_data if self.input_data is not None else {}
+            
         try:
-            # If handler is provided directly, use it
-            if self.handler is not None:
-                # Pass both self (task) and input_data to handler
-                result = self.handler(self, input_to_use)
+            if callable(self.handler):
+                # Import inspect only when needed
+                import inspect
                 
-            # Otherwise, use the handler registry to look up by name
-            elif hasattr(self, 'handler_name') and self.handler_name:
-                try:
-                    from core.services import get_handler_registry
-                    handler_registry = get_handler_registry()
-                    result = handler_registry.execute_handler(self.handler_name, self, input_to_use)
-                except (ImportError, ValueError) as e:
+                # Get handler signature
+                handler_sig = inspect.signature(self.handler)
+                param_count = len(handler_sig.parameters)
+                
+                # Call handler based on signature
+                if param_count == 1:
+                    # Single parameter handler - just pass input data
+                    result = self.handler(input_to_use)
+                elif param_count == 2:
+                    # Two parameter handler - pass task and input data
+                    result = self.handler(self, input_to_use)
+                else:
+                    # Invalid parameter count
                     return {
                         "success": False,
-                        "error": f"Handler execution failed: {str(e)}",
-                        "error_type": type(e).__name__
+                        "error": f"Handler has unexpected signature with {param_count} parameters. Expected 1 or 2 parameters.",
+                        "status": "failed"
                     }
+                
+                # Update task status
+                self.set_status("completed")
+                
+                # Ensure result is properly formatted as a dictionary
+                if not isinstance(result, dict):
+                    error_result = {
+                        "success": False,
+                        "error": f"Handler returned non-dict value: {result}",
+                        "result": result,
+                        "response": result,
+                        "status": "failed"
+                    }
+                    self.set_status("failed")
+                    return error_result
+                    
+                # If the result doesn't have a success field, assume success if no error
+                if "success" not in result:
+                    result["success"] = "error" not in result
+                
+                # Set status based on success
+                if result.get("success", True):
+                    self.set_status("completed")
+                else:
+                    self.set_status("failed")
+                    
+                # Ensure both result and response fields exist for compatibility
+                if "result" in result and "response" not in result:
+                    result["response"] = result["result"]
+                elif "response" in result and "result" not in result:
+                    result["result"] = result["response"]
+                    
+                return result
+            
+            # If this task has a handler_name but no direct handler, log an error
+            elif self.handler_name:
+                handler_str = self.handler_name
+                error_result = {
+                    "success": False,
+                    "error": f"No callable handler available for name: {handler_str}, use registry instead",
+                    "status": "failed"
+                }
+                self.set_status("failed")
+                return error_result
+            
             else:
-                return {
+                # No handler available
+                error_result = {
                     "success": False,
-                    "error": f"Task {self.id} has no handler function or handler_name",
-                    "error_type": "ConfigurationError"
+                    "error": "No handler function or name specified for DirectHandlerTask",
+                    "status": "failed"
                 }
-            
-            # Ensure result is properly formatted as a dictionary
-            if not isinstance(result, dict):
-                return {
-                    "success": False,
-                    "error": f"Handler returned non-dict value: {result}",
-                    "result": result,
-                    "response": result
-                }
+                self.set_status("failed")
+                return error_result
                 
-            # If the result doesn't have a success field, assume success if no error
-            if "success" not in result:
-                result["success"] = "error" not in result
-                
-            # Ensure both result and response fields exist for compatibility
-            if "result" in result and "response" not in result:
-                result["response"] = result["result"]
-            elif "response" in result and "result" not in result:
-                result["result"] = result["response"]
-                
-            return result
-            
         except Exception as e:
             import traceback
-            return {
+            error_result = {
                 "success": False,
                 "error": f"Handler execution failed: {str(e)}",
                 "error_type": type(e).__name__,
-                "traceback": traceback.format_exc()
+                "traceback": traceback.format_exc(),
+                "status": "failed"
             }
+            self.set_status("failed")
+            return error_result
 
     def to_dict(self) -> Dict[str, Any]:
         """

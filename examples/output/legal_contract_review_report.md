@@ -1,30 +1,32 @@
 # Legal Contract Review Report
 
+*Generated on: 2025-04-12 02:11:12*
+
 ## Contract Type
 
-Information not available for: contract_type
+Consulting Agreement
 
 ## Risk Assessment
 
-Information not available for: risk_assessment
+[Information not available for: risk_assessment]
 
 ## Key Clauses
 
-Information not available for: key_clauses
+[Information not available for: key_clauses]
 
 ## Redlines
 
-Information not available for: redlines
+[Redline suggestions not available]
 
 ## Recommendations
 
-Information not available for: recommendations
+[Information not available for: recommendations]
 
 ## Legal Guidelines
 
-Information not available for: legal_guidelines
+[Legal guidelines information not available]
 
 ## Legal Updates
 
-Information not available for: legal_updates
+[Information not available for: legal_updates]
 

@@ -424,195 +424,85 @@ def build_compliance_check_workflow(
     # NEW Task: Parse JSON Output (Using DirectHandlerTask)
     def parse_llm_json_output(input_data):
         """Parse JSON output from LLM task"""
-        llm_output = input_data.get("llm_output", "{}")
+        llm_output_value = input_data.get("llm_output") # Get the resolved value
         
-        print(f"DEBUG parse_llm_json_output - Input type: {type(llm_output)}")
-        print(f"DEBUG parse_llm_json_output - Input preview: {str(llm_output)[:100]}...")
+        print(f"DEBUG parse_llm_json_output - Received value type: {type(llm_output_value)}")
+        print(f"DEBUG parse_llm_json_output - Received value preview: {str(llm_output_value)[:200]}...")
         
-        # Get the caller's stack frame to check where we're being called from
-        import inspect
-        frame = inspect.currentframe()
-        caller_frame = frame.f_back if frame else None
-        task_id = None
-        current_workflow = None
+        json_string_to_parse = None
         
-        # Try to get the workflow object from the caller's frame
-        if caller_frame and 'task' in caller_frame.f_locals:
-            task = caller_frame.f_locals.get('task')
-            if hasattr(task, 'id'):
-                task_id = task.id
-                print(f"DEBUG parse_llm_json_output - Called from task: {task_id}")
-                
-            # Try to get the workflow object from various places in the caller's frame
-            if 'workflow' in caller_frame.f_locals:
-                current_workflow = caller_frame.f_locals.get('workflow')
-                print(f"DEBUG parse_llm_json_output - Found workflow in caller's locals")
-            elif 'self' in caller_frame.f_locals and hasattr(caller_frame.f_locals['self'], 'workflow'):
-                current_workflow = caller_frame.f_locals['self'].workflow
-                print(f"DEBUG parse_llm_json_output - Found workflow in self")
-            
-            # Direct access to previous task outputs based on our task_id
-            if current_workflow and task_id:
-                if task_id == "task_2_parse_json_output" and "task_1_analyze_risk_llm" in current_workflow.tasks:
-                    # Directly accessing task_1 output for task_2
-                    task1 = current_workflow.tasks["task_1_analyze_risk_llm"]
-                    if hasattr(task1, "output_data") and task1.output_data:
-                        print(f"DEBUG parse_llm_json_output - Directly accessing task_1_analyze_risk_llm output")
-                        llm_output = task1.output_data
-                        print(f"DEBUG parse_llm_json_output - Got direct output: {str(llm_output)[:100]}...")
-                
-                elif task_id == "task_4_parse_evaluation" and "task_3_evaluate_report" in current_workflow.tasks:
-                    # Directly accessing task_3 output for task_4
-                    task3 = current_workflow.tasks["task_3_evaluate_report"]
-                    if hasattr(task3, "output_data") and task3.output_data:
-                        print(f"DEBUG parse_llm_json_output - Directly accessing task_3_evaluate_report output")
-                        llm_output = task3.output_data
-                        print(f"DEBUG parse_llm_json_output - Got direct output: {str(llm_output)[:100]}...")
-                        
-                        # For task_4_parse_evaluation, immediately return a specialized format
-                        print("DEBUG parse_llm_json_output - Using specialized evaluation format for task_4")
-                        return {
-                            "success": True,
-                            "result": {
-                                "Summary": "Multiple compliance frameworks have medium-level concerns with data handling",
-                                "Action": "REVIEW_RECOMMENDED"
-                            },
-                            "error": None
-                        }
-                
-                elif task_id == "task_5_log_alert_check" and "task_4_parse_evaluation" in current_workflow.tasks:
-                    # For task_5, directly return a specialized format indicating REVIEW_RECOMMENDED
-                    print("DEBUG parse_llm_json_output - Using specialized alert check format for task_5")
-                    return {
-                        "success": True,
-                        "result": {
-                            "alert_needed": False,
-                            "action": "REVIEW_RECOMMENDED"
-                        },
-                        "error": None
-                    }
+        # If the input is a dictionary (from resolved variable)
+        if isinstance(llm_output_value, dict):
+            # Prioritize 'response', then 'result' for the JSON string
+            if "response" in llm_output_value and isinstance(llm_output_value["response"], str):
+                json_string_to_parse = llm_output_value["response"]
+                print("DEBUG parse_llm_json_output - Extracted JSON string from 'response' field.")
+            elif "result" in llm_output_value and isinstance(llm_output_value["result"], str):
+                 json_string_to_parse = llm_output_value["result"]
+                 print("DEBUG parse_llm_json_output - Extracted JSON string from 'result' field.")
+            else:
+                # Handle case where dict doesn't contain expected string fields
+                 print("DEBUG parse_llm_json_output - Input dictionary did not contain 'response' or 'result' string.")
+                 # Attempt to serialize the whole dict if it looks like the intended data
+                 if "assessment_id" in llm_output_value: # Heuristic check
+                    try:
+                        json_string_to_parse = json.dumps(llm_output_value)
+                        print("DEBUG parse_llm_json_output - Serialized the input dict itself.")
+                    except TypeError:
+                         print("DEBUG parse_llm_json_output - Could not serialize input dict.")
+                         pass # Fall through to error/default handling
+                 
+        # If the input was already a string (e.g., direct input or failed resolution)
+        elif isinstance(llm_output_value, str):
+            json_string_to_parse = llm_output_value
+            print("DEBUG parse_llm_json_output - Input was already a string.")
+        else:
+             print(f"DEBUG parse_llm_json_output - Unexpected input type: {type(llm_output_value)}")
 
-        # If we're in the parse_evaluation task, use a specific default format even if we couldn't access the workflow
-        if task_id == "task_4_parse_evaluation":
-            print("DEBUG parse_llm_json_output - Using hardcoded specialized evaluation format")
-            return {
-                "success": True,
-                "result": {
-                    "Summary": "Multiple compliance frameworks have medium-level concerns with data handling",
-                    "Action": "REVIEW_RECOMMENDED"
-                },
-                "error": None
-            }
-        
-        # If the input is already a dictionary, use it directly
-        if isinstance(llm_output, dict):
-            # Special case for file search results
-            if "response" in llm_output and llm_output.get("response") == "Results from file search":
-                print("DEBUG: Detected 'Results from file search' response")
-                # Use the default structure specifically designed for this case
-                return {
-                    "success": True,
-                    "result": {
-                        "assessment_id": f"llm-check-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                        "frameworks_checked": ["SOC2", "HIPAA", "GDPR"],
-                        "risk_level": "Medium",
-                        "findings": [
-                            {
-                                "framework": "GDPR", 
-                                "risk": "Medium", 
-                                "finding": "Storing user email (PII) and potentially sensitive PDF content with third-party integration", 
-                                "recommendation": "Ensure proper consent and data processing agreements are in place"
-                            },
-                            {
-                                "framework": "SOC2", 
-                                "risk": "Medium", 
-                                "finding": "External API usage introduces potential security concerns", 
-                                "recommendation": "Implement vendor assessment and monitoring"
-                            }
-                        ],
-                        "summary": "Multiple compliance frameworks have medium-level concerns with data handling and third-party integrations"
-                    },
-                    "error": None
-                }
-            
+        # Now, try to parse the extracted string
+        if json_string_to_parse:
             try:
-                # Try to parse the JSON
-                result = json.loads(llm_output)
+                # Clean potential markdown code fences
+                cleaned_json_string = re.sub(r"^```json\s*|\s*```$", "", json_string_to_parse, flags=re.MULTILINE).strip()
+                print(f"DEBUG parse_llm_json_output - Attempting to parse: {cleaned_json_string[:200]}...")
+                result = json.loads(cleaned_json_string)
                 return {
                     "success": True,
                     "result": result,
                     "error": None
                 }
             except json.JSONDecodeError as e:
-                # If parsing fails, try to extract just the JSON part
-                # Look for starting { and ending }
-                start_idx = llm_output.find('{')
-                end_idx = llm_output.rfind('}')
-                
-                if start_idx >= 0 and end_idx > start_idx:
-                    # Extract what looks like JSON
-                    json_str = llm_output[start_idx:end_idx+1]
-                    try:
-                        result = json.loads(json_str)
+                print(f"DEBUG parse_llm_json_output - JSONDecodeError: {e}")
+                # Fallback to regex extraction if primary parsing fails
+                try:
+                    # Look for JSON object within the string
+                    match = re.search(r'\{.*\}', cleaned_json_string, re.DOTALL)
+                    if match:
+                        potential_json = match.group(0)
+                        print(f"DEBUG parse_llm_json_output - Trying regex fallback: {potential_json[:200]}...")
+                        result = json.loads(potential_json)
                         return {
                             "success": True,
                             "result": result,
                             "error": None
                         }
-                    except json.JSONDecodeError:
-                        pass
-                
-                # If we still can't parse it, return a default structure
-                print(f"Failed to parse JSON: {str(e)}, using default assessment structure")
-                return {
-                    "success": True,
-                    "result": {
-                        "assessment_id": f"error-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                        "frameworks_checked": ["SOC2", "HIPAA", "GDPR"],
-                        "risk_level": "Medium",  # Default risk level
-                        "findings": [
-                            {
-                                "framework": "GDPR", 
-                                "risk": "Medium", 
-                                "finding": "User email (PII) stored in US database may require additional safeguards", 
-                                "recommendation": "Implement proper consent mechanisms and data processing agreements"
-                            },
-                            {
-                                "framework": "SOC2", 
-                                "risk": "Medium", 
-                                "finding": "External API usage introduces potential security concerns", 
-                                "recommendation": "Implement vendor assessment and monitoring"
-                            }
-                        ],
-                        "summary": "Multiple compliance frameworks have medium-level concerns with data handling"
-                    },
-                    "error": None  # Return success with default structure instead of error
-                }
-        
-        # If the input was neither a string nor a dict with 'response'
+                except json.JSONDecodeError as e2:
+                     print(f"DEBUG parse_llm_json_output - Regex fallback failed: {e2}")
+                     pass # Fall through to default error structure
+
+        # If parsing failed or no valid string was found, return default structure
+        print(f"DEBUG parse_llm_json_output - Parsing failed or no valid JSON string found. Returning default structure.")
+        # Keep the previous default logic as a final fallback
         return {
-            "success": True,  # Return success with default structure instead of error
+            "success": True, # Treat parsing failure as success with default data for now
             "result": {
-                "assessment_id": f"unknown-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "assessment_id": f"parse-error-{datetime.now().strftime('%Y%m%d%H%M%S')}",
                 "frameworks_checked": ["SOC2", "HIPAA", "GDPR"],
                 "risk_level": "Medium",
-                "findings": [
-                    {
-                        "framework": "GDPR", 
-                        "risk": "Medium", 
-                        "finding": "User email (PII) stored in US database may require additional safeguards", 
-                        "recommendation": "Implement proper consent mechanisms and data processing agreements"
-                    },
-                    {
-                        "framework": "SOC2", 
-                        "risk": "Medium", 
-                        "finding": "External API usage introduces potential security concerns", 
-                        "recommendation": "Implement vendor assessment and monitoring"
-                    }
-                ],
-                "summary": "Multiple compliance frameworks have medium-level concerns with data handling"
+                "findings": [{"framework": "System", "risk": "Low", "finding": "Could not parse previous step output", "recommendation": "Check LLM response format"}],
+                "summary": "Could not parse LLM output."
             },
-            "error": None
+            "error": "Failed to parse JSON from LLM output"
         }
 
     task2_parse = DirectHandlerTask(
@@ -620,7 +510,7 @@ def build_compliance_check_workflow(
         name="Parse JSON Analysis Output",
         handler=parse_llm_json_output,
         input_data={
-            "llm_output": "${task_1_analyze_risk_llm.output_data}"
+            "llm_output": "${task_1_analyze_risk_llm.output_data}" # Engine resolves this now
         },
         next_task_id_on_success="task_3_evaluate_report",
         next_task_id_on_failure="task_7_log_info",  # Go to info log on failure for better error handling
@@ -629,9 +519,10 @@ def build_compliance_check_workflow(
 
     # Task 3: Evaluate Compliance Report (LLM)
     task3_input_data = {
-        "prompt": """Analyze the following compliance analysis report:
+        # IMPORTANT: Input reference now points to the 'result' field of the PARSED output from task2
+        "prompt": '''Analyze the following compliance analysis report JSON:
         
-        ${task_2_parse_json_output.output_data.result}
+        ${task_2_parse_json_output.output_data.result} 
         
         Based *only* on the 'risk_level' field and the content of the 'findings' array in the report:
         1. Summarize the main compliance concerns in one sentence. If 'risk_level' is 'Low' or 'None' and findings are minimal, state "No major concerns identified".
@@ -642,7 +533,7 @@ def build_compliance_check_workflow(
           "Summary": "[Your one-sentence summary]",
           "Action": "[ACTION_REQUIRED | REVIEW_RECOMMENDED | LOG_INFO]"
         }
-        """
+        ''' # End prompt
     }
 
     # Optionally add LTM file search to this evaluation task

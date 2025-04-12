@@ -331,4 +331,4 @@ def patch_workflow_engine() -> None:
     # Replace the method
     WorkflowEngine.run_workflow = run_workflow_with_debug
     
-    logger.info("Workflow engine patched for debug mode") 
+    logger.info("Workflow engine patched for debug mode")
