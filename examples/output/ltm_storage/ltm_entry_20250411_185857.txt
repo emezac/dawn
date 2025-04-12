@@ -1,0 +1,12 @@
+Vector Store ID: vs_67f8ad0d8f6c8191876a0b514963310f
+Timestamp: 2025-04-11T18:58:57.937751
+Content Length: 229
+
+--- CONTENT ---
+
+LEGAL CONTRACT REVIEW (DEFAULT)
+Type: Consulting Agreement
+Parties: Company, Consultant
+Date: 2025-04-11 18:58:57
+
+NOTE: This is a default entry created because the original text_content contained unresolved template variables.
