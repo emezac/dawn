@@ -49,18 +49,27 @@ Reference a handler function by name that's registered in a HandlerRegistry:
 
 ```python
 from core.task import DirectHandlerTask
-from core.services import get_handler_registry
+# Use the global ServicesContainer to access the registry
+from core.services import get_services
+
+# Get the services container (usually initialized globally)
+services = get_services()
+handler_registry = services.handler_registry
 
 # Register the handler (typically done during application startup)
-handler_registry = get_handler_registry()
-
 @handler_registry.register()
 def process_data(input_data):
+    # Note: This handler uses the simpler single-parameter form
     result = input_data.get("value", 0) * 2
     return {
         "success": True,
         "result": result
     }
+
+# --- Alternatively, using registry_access functions --- 
+# from core.handlers.registry_access import register_handler
+# register_handler("process_data", process_data)
+# ----------------------------------------------------
 
 # Create a task that references the handler by name
 task = DirectHandlerTask(
