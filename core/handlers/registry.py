@@ -85,6 +85,17 @@ class HandlerRegistry:
             logger.warning(f"Handler '{name}' not found in registry")
         return handler
 
+    def handler_exists(self, name: str) -> bool:
+        """Check if a handler with the given name exists in the registry.
+        
+        Args:
+            name: The name of the handler to check
+            
+        Returns:
+            True if the handler exists, False otherwise
+        """
+        return name in self._handlers
+
     def execute_handler(self, name: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a handler function by name.
 

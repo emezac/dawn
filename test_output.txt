@@ -1,0 +1,60 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.14, pytest-8.3.5, pluggy-1.5.0 -- /Users/admin/code/newstart/dawn/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/admin/code/newstart/dawn
+configfile: pytest.ini
+plugins: anyio-4.9.0
+collecting ... collected 1 item
+
+tests/core/test_execute_dynamic_tasks.py::TestExecuteDynamicTasksHandler::test_execute_dynamic_tasks_invalid_task_type FAILED [100%]
+
+=================================== FAILURES ===================================
+_ TestExecuteDynamicTasksHandler.test_execute_dynamic_tasks_invalid_task_type __
+
+self = <tests.core.test_execute_dynamic_tasks.TestExecuteDynamicTasksHandler testMethod=test_execute_dynamic_tasks_invalid_task_type>
+
+    def test_execute_dynamic_tasks_invalid_task_type(self):
+        """Test with invalid task type."""
+        # Create task definitions with invalid type
+        invalid_tasks = [
+            {
+                "task_id": "invalid_task",
+                "name": "Invalid Task",
+                # Missing both tool_name and handler_name
+                "input_data": {"test": "data"},
+                "depends_on": []
+            }
+        ]
+    
+        # Execute handler
+        result = execute_dynamic_tasks_handler(
+            self.mock_task,
+            {"tasks": invalid_tasks}
+        )
+    
+        # Should still succeed overall, but task should fail
+>       self.assertTrue(result["success"])
+E       AssertionError: False is not true
+
+tests/core/test_execute_dynamic_tasks.py:196: AssertionError
+------------------------------ Captured log call -------------------------------
+DEBUG    core.services:services.py:304 Global ServicesContainer reset.
+DEBUG    core.services:services.py:43 ServicesContainer initialized.
+DEBUG    core.services:services.py:118 Registered service: tool_registry
+DEBUG    core.services:services.py:248 Custom ToolRegistry registered.
+DEBUG    core.handlers.registry:registry.py:28 Initialized HandlerRegistry
+DEBUG    core.services:services.py:118 Registered service: handler_registry
+DEBUG    core.services:services.py:259 Custom HandlerRegistry registered.
+DEBUG    core.handlers.registry:registry.py:72 Registered handler 'mock_summarize'
+INFO     chat_planner_workflow:chat_planner_workflow.py:1033 Executing dynamic tasks handler for task: execute_dynamic_tasks
+DEBUG    chat_planner_workflow:chat_planner_workflow.py:1040 Input data keys: ['tasks']
+DEBUG    chat_planner_workflow:chat_planner_workflow.py:1056 Found 1 tasks to execute
+WARNING  core.services:services.py:115 Service 'tool_registry' already registered. Overwriting.
+DEBUG    core.services:services.py:118 Registered service: tool_registry
+DEBUG    core.services:services.py:69 ServicesContainer initialized with default services.
+WARNING  chat_planner_workflow:chat_planner_workflow.py:1087 Step invalid_task: No tool_name or handler_name specified. Skipping.
+INFO     chat_planner_workflow:chat_planner_workflow.py:1271 --- Dynamic Task Execution Simulation Complete ---
+DEBUG    chat_planner_workflow:chat_planner_workflow.py:1294 Final output list: [{'success': False, 'error': 'No tool_name or handler_name specified', 'task_id': 'invalid_task'}]
+=========================== short test summary info ============================
+FAILED tests/core/test_execute_dynamic_tasks.py::TestExecuteDynamicTasksHandler::test_execute_dynamic_tasks_invalid_task_type
+============================== 1 failed in 0.55s ===============================

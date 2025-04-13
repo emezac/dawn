@@ -5,9 +5,9 @@ from typing import Dict, Optional, List, Any
 # Assuming access to registries via services
 from core.services import get_services
 # Assuming registry access functions are available if needed directly
-# from core.tools.registry_access import get_available_tools, get_registry
+from core.tools.registry_access import get_available_tools, get_registry, register_tool, tool_exists
 # Corrected import for handler registry access
-# from core.handlers.registry_access import get_handler_registry
+from core.handlers.registry_access import get_handler_registry
 from core.tools.registry import ToolRegistry # Keep for type hinting
 from core.handlers.registry import HandlerRegistry # Keep for type hinting
 
@@ -103,14 +103,16 @@ def get_available_capabilities(input_data: dict = None) -> dict:
         }
 
 # --- Ensure Tool is Registered ---
-# This registration logic should ideally happen during application startup/initialization
-# try:
-#     from core.tools.registry_access import register_tool, tool_exists
-#     if not tool_exists("get_available_capabilities"):
-#         register_tool("get_available_capabilities", get_available_capabilities)
-#         logger.info("Registered 'get_available_capabilities' tool.")
-# except ImportError:
-#      logger.error("Could not import registry functions for tool registration.")
-# except Exception as e:
-#      logger.error(f"Error registering 'get_available_capabilities' tool: {e}")
+# This registration happens when the module is imported
+try:
+    # Check if tool already exists before registering
+    if not tool_exists("get_available_capabilities"):
+        register_tool("get_available_capabilities", get_available_capabilities)
+        logger.info("Registered 'get_available_capabilities' tool.")
+    else:
+        logger.debug("Tool 'get_available_capabilities' already registered.")
+except ImportError:
+     logger.error("Could not import registry functions for tool registration.")
+except Exception as e:
+     logger.error(f"Error registering 'get_available_capabilities' tool: {e}")
 # 

@@ -129,6 +129,45 @@ When extending or modifying the Chat Planner Workflow:
 4. **Testing:** Thoroughly test with a variety of user requests to ensure robustness
 5. **Documentation:** Keep documentation updated as the workflow evolves
 
+## Configuration
+
+The Chat Planner Workflow requires proper configuration to function correctly. The configuration is managed through environment-specific configuration files (`config/development.json`, `config/production.json`, etc.) and the `ChatPlannerConfig` class.
+
+### Required Configuration Structure
+
+To use the Chat Planner, ensure your environment configuration files include the following structure:
+
+```json
+{
+  "chat_planner": {
+    "llm_model": "gpt-4", 
+    "llm_temperature": 0.2,
+    "max_tokens": 4000,
+    "enable_plan_validation": true,
+    "validation_strictness": "high",
+    "prompts": {
+      "ambiguity_check": "", 
+      "planning": "",
+      "plan_validation": "",
+      "summarization": ""
+    }
+  }
+}
+```
+
+If the `prompts` section is empty or missing, the system will fall back to default prompt templates defined in the `ChatPlannerConfig` class. However, it's recommended to provide custom prompt templates for production use to ensure optimal planning quality.
+
+### Customizing Prompts
+
+For more control over the planning process, customize the prompts in your configuration:
+
+- `ambiguity_check`: Prompt template for detecting ambiguity in user requests
+- `planning`: Main prompt for generating the execution plan
+- `plan_validation`: Prompt for validating the generated plan
+- `summarization`: Prompt for summarizing execution results
+
+Each template can contain placeholders like `{user_request}`, `{available_tools}`, etc. that will be replaced with actual values during execution.
+
 ## Conclusion
 
 The Chat Planner Workflow represents a significant advancement in the Dawn framework's capabilities, enabling more dynamic, user-driven workflows. By following the implementation details and best practices outlined in this document, developers can effectively utilize, extend, and customize this powerful component to meet their specific needs. 

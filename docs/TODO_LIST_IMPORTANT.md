@@ -16,7 +16,7 @@ This list outlines the key tasks required to implement a workflow that takes nat
 
 *(Assumes details are in `PRD_THINK_ANALIZE.md`)*
 
--   [ ] **Implement Core Planning Logic (`ThinkAnalyzeTask` or Handler):**
+-   [x] **Implement Core Planning Logic (`ThinkAnalyzeTask` or Handler):**
     -   [x] Create a new `Task` subclass or `DirectHandlerTask` handler responsible for the planning.
     -   [x] Develop the core prompt(s) for the LLM planner based on PRD requirements.
         -   [x] Incorporate instructions for generating a *structured* and *consistent* plan.
@@ -27,7 +27,7 @@ This list outlines the key tasks required to implement a workflow that takes nat
         -   List of available handlers from `HandlerRegistry`.
         -   (Optional) Relevant conversation history or user profile data.
     -   [X] Design a `GetAvailableCapabilities` tool/handler to fetch current tools/handlers dynamically.
--   [ ] **Define and Validate Plan Output:**
+-   [x] **Define and Validate Plan Output:**
     -   [X] Specify the exact structured format for the plan (e.g., JSON list of steps with details like `step_description`, `required_tool_or_handler`, `inputs`, `outputs`, `dependencies`).
     -   [X] Implement robust parsing and validation for the LLM's plan output:
         -   [X] Added JSON Schema validation using `jsonschema` library in `validate_plan_handler`.
@@ -59,7 +59,7 @@ This list outlines the key tasks required to implement a workflow that takes nat
 
 ## Phase 4: Execution & Output
 
--   [ ] **Workflow Engine Compatibility:**
+-   [x] **Workflow Engine Compatibility:**
     -   [X] Ensure `WorkflowEngine` can handle the chosen method for executing generated tasks (dynamic addition or sub-workflows).
     -   [X] Verify variable resolution works correctly for inputs/outputs of dynamically generated tasks.
 -   [X] **Define Output Mechanism:**
@@ -71,20 +71,21 @@ This list outlines the key tasks required to implement a workflow that takes nat
 -   [X] **Error Handling:**
     -   [X] Implement robust error handling for failures during planning, task generation, and task execution phases.
     -   [X] Define how errors are reported back to the user.
--   [ ] **Tool/Handler Registry:**
-    -   [ ] Ensure all necessary tools (like `GetAvailableCapabilities`) and handlers (`PlanToTasksHandler`, `PlanValidationHandler`, chat handlers) are registered correctly.
--   [ ] **Configuration:**
-    -   [ ] Add necessary configuration options (e.g., planner LLM model, prompts, output schemas).
--   [ ] **Documentation:**
+-   [X] **Tool/Handler Registry:**
+    -   [X] Ensure all necessary tools (like `GetAvailableCapabilities`) and handlers (`PlanToTasksHandler`, `PlanValidationHandler`, chat handlers) are registered correctly.
+-   [X] **Configuration:**
+    -   [X] Add necessary configuration options (e.g., planner LLM model, prompts, output schemas).
+    -   [X] Improve environment-specific configurations for development/testing/production.
+-   [x] **Documentation:**
     -   [X] Create documentation for the new workflow (`chat_planner_workflow.md`).
     -   [X] Document the "Think & Analyze" component (`ThinkAnalyzeTask` or handler).
     -   [ ] Document the `PlanToTasksHandler`.
     -   [X] Document the Plan Schema Validation (`plan_schema_validation.md`).
     -   [X] Create comprehensive implementation overview (`chat_planner_implementation.md`).
-    -   [ ] Update `README.md` with usage examples.
+    -   [X] Update `README.md` with usage examples.
 -   [ ] **Testing:**
-    -   [ ] Unit tests for new handlers/tasks (`ThinkAnalyzeTask`, `PlanToTasksHandler`, etc.).
-    -   [ ] Unit tests for the plan validation logic.
+    -   [X] Unit tests for new handlers/tasks (`ThinkAnalyzeTask`, `PlanToTasksHandler`, etc.).
+    -   [X] Unit tests for the plan validation logic. (All tests passing as of latest fixes)
     -   [ ] Integration tests for the end-to-end chat -> plan -> execute workflow.
     -   [ ] Test various chat inputs (simple, complex, ambiguous).
     -   [ ] Test error handling scenarios.

@@ -270,6 +270,88 @@ DEFAULT_SCHEMA = {
         "type": bool,
         "default": True,
         "description": "Enable performance monitoring in debug mode"
+    },
+    "chat_planner": {
+        "type": dict,
+        "default": {
+            "llm_model": "gpt-3.5-turbo",
+            "llm_temperature": 0.7,
+            "max_tokens": 2000,
+            "max_clarifications": 3,
+            "enable_plan_validation": True,
+            "validation_strictness": "medium",
+            "planning_system_message": "You are an expert AI assistant for the Dawn workflow framework. Your task is to analyze the user's request and create a detailed execution plan."
+        },
+        "description": "Chat planner workflow configuration",
+        "schema": {
+            "llm_model": {
+                "type": str,
+                "default": "gpt-3.5-turbo",
+                "env_var": "DAWN_CHAT_PLANNER_LLM_MODEL",
+                "description": "LLM model used for plan generation"
+            },
+            "llm_temperature": {
+                "type": float,
+                "default": 0.7,
+                "env_var": "DAWN_CHAT_PLANNER_LLM_TEMPERATURE",
+                "description": "Temperature setting for plan generation LLM calls",
+                "constraints": {
+                    "min": 0.0,
+                    "max": 2.0
+                }
+            },
+            "max_tokens": {
+                "type": int,
+                "default": 2000,
+                "env_var": "DAWN_CHAT_PLANNER_MAX_TOKENS",
+                "description": "Maximum tokens for LLM responses",
+                "constraints": {
+                    "min": 100,
+                    "max": 8000
+                }
+            },
+            "max_clarifications": {
+                "type": int,
+                "default": 3,
+                "env_var": "DAWN_CHAT_PLANNER_MAX_CLARIFICATIONS",
+                "description": "Maximum number of clarification iterations",
+                "constraints": {
+                    "min": 0,
+                    "max": 10
+                }
+            },
+            "enable_plan_validation": {
+                "type": bool,
+                "default": True,
+                "env_var": "DAWN_CHAT_PLANNER_ENABLE_VALIDATION",
+                "description": "Enable validation of generated plans"
+            },
+            "validation_strictness": {
+                "type": str,
+                "default": "medium",
+                "env_var": "DAWN_CHAT_PLANNER_VALIDATION_STRICTNESS",
+                "description": "Strictness level for plan validation",
+                "constraints": {
+                    "allowed_values": ["low", "medium", "high"]
+                }
+            },
+            "planning_system_message": {
+                "type": str,
+                "default": "You are an expert AI assistant for the Dawn workflow framework. Your task is to analyze the user's request and create a detailed execution plan.",
+                "env_var": "DAWN_CHAT_PLANNER_SYSTEM_MESSAGE",
+                "description": "System message for the planning LLM"
+            },
+            "prompts": {
+                "type": dict,
+                "default": {
+                    "ambiguity_check": "",
+                    "planning": "",
+                    "plan_validation": "",
+                    "summarization": ""
+                },
+                "description": "Custom prompt templates for different stages of the workflow"
+            }
+        }
     }
 }
 

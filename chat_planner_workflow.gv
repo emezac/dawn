@@ -1,10 +1,10 @@
 digraph {
-	graph [bb="0,0,545.5,539",
+	graph [bb="0,0,602.5,726",
 		fontsize=20,
-		label="Workflow: Chat-Driven Planning Workflow (ID: chat_planner_v1)",
+		label="Workflow: Chat-Driven Planning Workflow (ID: chat_planner_workflow)",
 		lheight=0.31,
-		lp="272.75,15.25",
-		lwidth=7.35,
+		lp="301.25,15.25",
+		lwidth=8.15,
 		rankdir=TB
 	];
 	node [label="\N"];
@@ -12,7 +12,7 @@ digraph {
 		height=0.56944,
 		label="ID: get_capabilities
 Name: Get Available Tools and Handlers",
-		pos="371.56,518.5",
+		pos="181.25,612",
 		shape=box,
 		style=filled,
 		width=3.3368];
@@ -20,89 +20,117 @@ Name: Get Available Tools and Handlers",
 		height=0.56944,
 		label="ID: think_analyze_plan
 Name: Generate Execution Plan",
-		pos="371.56,425",
+		pos="181.25,518.5",
 		shape=box,
 		style=filled,
 		width=2.6597];
 	get_capabilities -> think_analyze_plan	[color=green,
 		label=" on_success",
-		lp="403.81,471.75",
-		pos="e,371.56,445.82 371.56,497.65 371.56,485.78 371.56,470.44 371.56,457",
+		lp="213.5,565.25",
+		pos="e,181.25,539.32 181.25,591.15 181.25,579.28 181.25,563.94 181.25,550.5",
+		style=dashed];
+	check_for_clarification_needed	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: check_for_clarification_needed
+Name: Check if Clarification is Needed",
+		pos="299.25,425",
+		shape=box,
+		style=filled,
+		width=3.2326];
+	think_analyze_plan -> check_for_clarification_needed	[color=green,
+		label=" on_success",
+		lp="283.07,471.75",
+		pos="e,273.7,445.82 206.85,497.65 223.79,484.52 246.19,467.14 264.7,452.79",
 		style=dashed];
 	validate_plan	[fillcolor=lightgrey,
 		height=0.56944,
 		label="ID: validate_plan
-Name: Validate Generated Plan",
-		pos="371.56,331.5",
+Name: Validate Plan Structure and Content",
+		pos="299.25,331.5",
 		shape=box,
 		style=filled,
-		width=2.5972];
-	think_analyze_plan -> validate_plan	[color=green,
+		width=3.4826];
+	check_for_clarification_needed -> validate_plan	[color=green,
 		label=" on_success",
-		lp="403.81,378.25",
-		pos="e,371.56,352.32 371.56,404.15 371.56,392.28 371.56,376.94 371.56,363.5",
+		lp="331.5,378.25",
+		pos="e,299.25,352.32 299.25,404.15 299.25,392.28 299.25,376.94 299.25,363.5",
 		style=dashed];
-	generate_tasks	[fillcolor=lightgrey,
+	await_clarification	[fillcolor=lightblue,
 		height=0.56944,
-		label="ID: generate_tasks
-Name: Generate Tasks From Plan",
-		pos="306.56,238",
+		label="ID: await_clarification
+Name: Await User Clarification",
+		pos="419.25,705.5",
 		shape=box,
 		style=filled,
-		width=2.7951];
-	validate_plan -> generate_tasks	[color=green,
+		width=2.6285];
+	process_clarification	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: process_clarification
+Name: Process User Clarification",
+		pos="419.25,612",
+		shape=box,
+		style=filled,
+		width=2.7639];
+	await_clarification -> process_clarification	[color=green,
 		label=" on_success",
-		lp="377.13,284.75",
-		pos="e,320.64,258.82 357.46,310.65 348.6,298.18 337.02,281.88 327.15,267.98",
+		lp="451.5,658.75",
+		pos="e,419.25,632.82 419.25,684.65 419.25,672.78 419.25,657.44 419.25,644",
 		style=dashed];
-	handle_plan_failure	[fillcolor=lightgrey,
+	restart_planning	[fillcolor=lightgrey,
 		height=0.56944,
-		label="ID: handle_plan_failure
-Name: Handle Plan Generation/Validation Failure",
-		pos="392.56,51",
+		label="ID: restart_planning
+Name: Restart Planning with Clarification",
+		pos="418.25,518.5",
 		shape=box,
 		style=filled,
-		width=4.0035];
-	validate_plan -> handle_plan_failure	[color=red,
-		label=" on_failure",
-		lp="455.3,191.25",
-		pos="e,402.96,71.848 399.72,310.8 405.18,305.65 410.24,299.64 413.56,293 420.46,279.24 415.48,273.85 416.56,258.5 420.75,198.83 432.94,\
-182.73 421.56,124 418.81,109.78 413.25,94.802 407.73,82.215",
+		width=3.4201];
+	process_clarification -> restart_planning	[color=green,
+		label=" on_success",
+		lp="451.09,565.25",
+		pos="e,418.47,539.32 419.03,591.15 418.9,579.28 418.74,563.94 418.59,550.5",
+		style=dashed];
+	restart_planning -> check_for_clarification_needed	[color=green,
+		label=" on_success",
+		lp="401.66,471.75",
+		pos="e,325.02,445.82 392.43,497.65 375.35,484.52 352.76,467.14 334.1,452.79",
+		style=dashed];
+	plan_to_tasks	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: plan_to_tasks
+Name: Convert Plan to Executable Tasks",
+		pos="299.25,238",
+		shape=box,
+		style=filled,
+		width=3.3368];
+	validate_plan -> plan_to_tasks	[color=green,
+		label=" on_success",
+		lp="331.5,284.75",
+		pos="e,299.25,258.82 299.25,310.65 299.25,298.78 299.25,283.44 299.25,270",
 		style=dashed];
 	execute_dynamic_tasks	[fillcolor=lightgrey,
 		height=0.56944,
 		label="ID: execute_dynamic_tasks
-Name: Execute Generated Tasks (Simulation)",
-		pos="179.56,144.5",
+Name: Execute Dynamic Tasks",
+		pos="299.25,144.5",
 		shape=box,
 		style=filled,
-		width=3.7014];
-	generate_tasks -> execute_dynamic_tasks	[color=green,
+		width=2.6181];
+	plan_to_tasks -> execute_dynamic_tasks	[color=green,
 		label=" on_success",
-		lp="286.69,191.25",
-		pos="e,207.07,165.32 279.01,217.15 260.62,203.9 236.23,186.33 216.21,171.9",
-		style=dashed];
-	generate_tasks -> handle_plan_failure	[color=red,
-		label=" on_failure",
-		lp="387.74,144.5",
-		pos="e,383.3,71.936 315.77,217.2 330.86,184.74 360.95,120.01 378.65,81.922",
+		lp="331.5,191.25",
+		pos="e,299.25,165.32 299.25,217.15 299.25,205.28 299.25,189.94 299.25,176.5",
 		style=dashed];
 	summarize_results	[fillcolor=lightgrey,
 		height=0.56944,
 		label="ID: summarize_results
 Name: Summarize Execution Results",
-		pos="119.56,51",
+		pos="299.25,51",
 		shape=box,
 		style=filled,
 		width=3.0764];
 	execute_dynamic_tasks -> summarize_results	[color=green,
 		label=" on_success",
-		lp="187.19,97.75",
-		pos="e,132.56,71.815 166.54,123.65 158.45,111.3 147.89,95.192 138.83,81.381",
-		style=dashed];
-	execute_dynamic_tasks -> handle_plan_failure	[color=red,
-		label=" on_failure",
-		lp="304.94,97.75",
-		pos="e,322.26,71.911 211.08,123.57 229.36,112.56 253.1,99.195 275.31,89.5 286.83,84.475 299.23,79.78 311.52,75.529",
+		lp="331.5,97.75",
+		pos="e,299.25,71.815 299.25,123.65 299.25,111.78 299.25,96.437 299.25,83",
 		style=dashed];
 }

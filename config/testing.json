@@ -1,0 +1,50 @@
+{
+  "environment": "test",
+  "debug_mode": true,
+  "log_level": "DEBUG",
+  "strict_config_validation": true,
+  
+  "llm_provider": "mock",
+  "llm_model": "mock-model",
+  "llm_temperature": 0.0,
+  
+  "workflow_engine": {
+    "max_retries": 1,
+    "retry_delay": 0,
+    "timeout": 30
+  },
+  
+  "vector_store": {
+    "provider": "in-memory",
+    "path": "./test-data/vectors",
+    "embedding_model": "mock-embeddings"
+  },
+  
+  "http_server": {
+    "host": "127.0.0.1",
+    "port": 8089,
+    "cors_origins": ["http://localhost:3000"]
+  },
+  
+  "data_directory": "./test-data",
+  "cache_directory": "./test-cache",
+  
+  "tool_registry": {
+    "tool_paths": ["./core/tools", "./tests/mocks/tools"],
+    "auto_discover": false
+  },
+  
+  "chat_planner": {
+    "llm_model": "mock-llm",
+    "llm_temperature": 0.0,
+    "max_tokens": 1000,
+    "enable_plan_validation": true,
+    "validation_strictness": "high",
+    "prompts": {
+      "ambiguity_check": "",
+      "planning": "",
+      "plan_validation": "",
+      "summarization": ""
+    }
+  }
+} 

@@ -222,6 +222,133 @@ agent = Agent(
 - **Simple Conditional Workflow**: `examples/simple_conditional_workflow.py`
 - **Complex Workflow**: `examples/complex_workflow.py`
 - **Vector Store Example**: `examples/vector_store_example.py`
+- **Smart Compliance Workflow**: `examples/smart_compliance_workflow.py`
+- **Chat Planner Workflow**: `examples/chat_planner_workflow.py`
+
+### Chat Planner Workflow
+
+The Chat Planner Workflow represents an advanced implementation that processes natural language user requests and dynamically generates execution plans. This workflow demonstrates how to build "think before acting" patterns that analyze user requests, determine the required steps, and execute them.
+
+#### Usage Example
+
+```python
+from core.services import get_services, reset_services
+from core.handlers.registry_access import register_handler
+from core.tools.registry_access import register_tool, execute_tool
+from core.tools.framework_tools import get_available_capabilities
+from core.utils.registration_manager import ensure_all_registrations
+from core.workflow import Workflow
+from core.task import DirectHandlerTask
+from examples.chat_planner_config import ChatPlannerConfig
+
+# Initialize services and registries
+reset_services()
+services = get_services()
+ensure_all_registrations()  # Register all required tools and handlers
+
+# Set up your custom handlers and tools if needed
+register_handler("custom_handler", my_custom_handler_function)
+register_tool("custom_tool", my_custom_tool_function)
+
+# Create a workflow that implements the Chat Planner pattern
+workflow = Workflow(workflow_id="chat_planner", name="Chat Planning Workflow")
+
+# 1. Input Task - Start with the user's request
+input_task = Task(
+    task_id="get_user_input",
+    name="Get User Input",
+    input_data={"user_request": "Please search for the latest news about AI and summarize it"},
+    next_task_id_on_success="get_capabilities"
+)
+workflow.add_task(input_task)
+
+# 2. Get available capabilities (tools and handlers)
+get_capabilities_task = DirectHandlerTask(
+    task_id="get_capabilities",
+    name="Get Available Capabilities",
+    handler=get_available_capabilities,
+    input_data={},
+    next_task_id_on_success="think_analyze_plan"
+)
+workflow.add_task(get_capabilities_task)
+
+# 3. Planning Task - Analyze the request and create an execution plan
+plan_task = DirectHandlerTask(
+    task_id="think_analyze_plan",
+    name="Think & Analyze Planning",
+    handler=plan_user_request_handler,
+    input_data={
+        "user_request": "${get_user_input.input_data.user_request}",
+        "available_tools_context": "${get_capabilities.output_data.result.available_tools}",
+        "available_handlers_context": "${get_capabilities.output_data.result.available_handlers}"
+    },
+    next_task_id_on_success="validate_plan"
+)
+workflow.add_task(plan_task)
+
+# 4. Validate the generated plan
+validate_plan_task = DirectHandlerTask(
+    task_id="validate_plan",
+    name="Validate Generated Plan",
+    handler=validate_plan_handler,
+    input_data={
+        "plan": "${think_analyze_plan.output_data.result.plan}",
+        "user_request": "${get_user_input.input_data.user_request}",
+        "available_tools": "${get_capabilities.output_data.result.available_tools}",
+        "available_handlers": "${get_capabilities.output_data.result.available_handlers}"
+    },
+    next_task_id_on_success="generate_tasks"
+)
+workflow.add_task(validate_plan_task)
+
+# 5. Generate dynamic tasks based on the plan
+generate_tasks_task = DirectHandlerTask(
+    task_id="generate_tasks",
+    name="Convert Plan to Tasks",
+    handler=plan_to_tasks_handler,
+    input_data={"validated_plan": "${validate_plan.output_data.result.validated_plan}"},
+    next_task_id_on_success="execute_dynamic_tasks"
+)
+workflow.add_task(generate_tasks_task)
+
+# 6. Execute the dynamically generated tasks
+execute_tasks_task = DirectHandlerTask(
+    task_id="execute_dynamic_tasks",
+    name="Execute Dynamic Tasks",
+    handler=execute_dynamic_tasks_handler,
+    input_data={"dynamic_tasks": "${generate_tasks.output_data.result.tasks}"},
+    next_task_id_on_success="summarize_results"
+)
+workflow.add_task(execute_tasks_task)
+
+# 7. Summarize results for the user
+summarize_task = DirectHandlerTask(
+    task_id="summarize_results",
+    name="Summarize Results",
+    handler=summarize_results_handler,
+    input_data={
+        "user_request": "${get_user_input.input_data.user_request}",
+        "execution_results": "${execute_dynamic_tasks.output_data.result}"
+    },
+    next_task_id_on_success=None  # End of workflow
+)
+workflow.add_task(summarize_task)
+
+# Run the workflow
+agent = Agent(agent_id="chat_planner_agent", name="Chat Planning Agent")
+agent.load_workflow(workflow)
+result = agent.run()
+```
+
+The Chat Planner demonstrates several advanced features:
+- **Think before acting**: Uses LLMs to analyze user requests and plan execution steps
+- **Dynamic task generation**: Creates tasks at runtime based on analysis of the request 
+- **Capability discovery**: Automatically detects available tools and handlers
+- **Validation**: Validates generated plans before execution
+- **Clarification loop**: Detects ambiguity in requests and asks for clarification when needed
+- **Error handling**: Handles various errors including malformed plans and execution failures
+
+For more details, see the `examples/chat_planner_workflow.py` implementation and `docs/chat_planner_implementation.md` documentation.
 
 ## Overview
 

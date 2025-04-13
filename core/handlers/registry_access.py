@@ -82,19 +82,21 @@ def register_handler(name: str, handler: Callable, replace: bool = False) -> boo
     """
     registry = get_handler_registry()
 
-    if registry.handler_exists(name) and not replace:
+    # Check if handler already exists
+    if name in registry.list_handlers() and not replace:
         logger.warning(f"Handler '{name}' already registered and replace=False")
         return False
 
     try:
-        if registry.handler_exists(name) and replace:
+        if name in registry.list_handlers() and replace:
              # Assuming HandlerRegistry has a remove method, otherwise direct dict access
              if hasattr(registry, 'remove_handler'):
                  registry.remove_handler(name)
              else:
                  # Direct modification if necessary (less ideal)
-                 if name in registry._handlers: # Accessing protected member potentially
-                     del registry._handlers[name]
+                 if hasattr(registry, '_handlers'):
+                     if name in registry._handlers: # Accessing protected member potentially
+                         del registry._handlers[name]
              logger.debug(f"Removed existing handler '{name}' for replacement")
 
         registry.register_handler(name, handler)
@@ -146,6 +148,5 @@ def handler_exists(name: str) -> bool:
         bool: True if the handler exists, False otherwise
     """
     registry = get_handler_registry()
-    # Check directly if the name is in the internal dictionary keys
-    # Accessing protected member _handlers is necessary if no public method exists
-    return name in registry._handlers 
+    # Use list_handlers() method rather than accessing protected member directly
+    return name in registry.list_handlers() 
