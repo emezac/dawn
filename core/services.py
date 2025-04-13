@@ -9,7 +9,7 @@ from .tools.registry import ToolRegistry
 from .tools.registry_access import get_registry as get_tool_registry_singleton
 from .tools.registry_access import reset_registry as reset_tool_registry_singleton
 from .llm.interface import LLMInterface
-from .tools.handler_registry import HandlerRegistry
+from .handlers.registry import HandlerRegistry
 
 logger = logging.getLogger(__name__)
 

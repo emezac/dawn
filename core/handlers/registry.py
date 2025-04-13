@@ -59,11 +59,12 @@ class HandlerRegistry:
         if name in self._handlers:
             logger.warning(f"Handler '{name}' already registered. Overwriting.")
 
-        # Verify that the handler has the correct signature
+        # Verify that the handler has the correct signature (task, input_data)
         sig = inspect.signature(handler)
-        if len(sig.parameters) != 1:
+        # Allow for 2 parameters (task, input_data) or potentially 1 (input_data only)
+        if len(sig.parameters) not in [1, 2]:
             logger.warning(
-                f"Handler '{name}' doesn't have exactly one parameter. "
+                f"Handler '{name}' has {len(sig.parameters)} parameters, expected 1 (input_data) or 2 (task, input_data). "
                 "This may cause issues during execution."
             )
         

@@ -77,25 +77,54 @@ workflow.add_task(task)
 
 Handler functions can follow either of two patterns:
 
-1. **Two-parameter form (recommended)**:
+1. **Two-parameter form (for more control)**:
    ```python
    def handler(task, input_data):
-       # task: The DirectHandlerTask instance
-       # input_data: Dictionary containing the processed input
+       # task: The DirectHandlerTask instance (access to task properties)
+       # input_data: Dictionary containing the input data
        return {"success": True, "result": "Task completed"}
    ```
 
-2. **Single-parameter form**:
+2. **Single-parameter form (for simplicity)**:
    ```python
    def handler(input_data):
-       # input_data: Dictionary containing the processed input
+       # input_data: Dictionary containing the input data
        return {"success": True, "result": "Task completed"}
    ```
+
+The function signature is detected automatically at runtime, so you can use either form as needed.
 
 The handler function should return a dictionary with at least:
 - `success`: Boolean indicating success or failure
 - `result`: The output data on success
 - `error`: Error message on failure (optional)
+- `error_type`: Type of error encountered (optional)
+
+If the `success` field is omitted, it will be automatically inferred (True if no `error` field is present).
+
+## Input Data Handling in `execute()`
+
+The `DirectHandlerTask.execute()` method has the following logic for determining the input data passed to the handler:
+
+1.  **`processed_input` Priority:** If the `processed_input` argument is provided to `execute()` (typically by the `WorkflowEngine` after resolving variables), this dictionary is used as the input for the handler.
+2.  **Fallback to `self.input_data`:** If `processed_input` is `None` or an empty dictionary (e.g., when `execute()` is called directly in tests without going through the engine), the task falls back to using its own `self.input_data` attribute.
+
+This ensures that the task works correctly both within the workflow engine (using resolved inputs) and in standalone tests (using the task's defined `input_data`).
+
+## Task Status Updates
+
+The `DirectHandlerTask` automatically updates the task status based on the execution result:
+
+- `status = "completed"` when:
+  - The handler executes successfully and returns `{"success": true}`
+  - The execution is successful and no explicit `success` field is provided
+
+- `status = "failed"` when:
+  - The handler raises an exception
+  - The handler returns `{"success": false}`
+  - The handler returns a non-dictionary value
+
+This automatic status updating allows workflows to properly track task execution state without additional code.
 
 ## Integration with the WorkflowEngine
 
@@ -219,4 +248,66 @@ process_task = DirectHandlerTask(
     input_data={"user_data": "${fetch_user_data.result}"}
 )
 workflow.add_task(process_task)
-``` 
+```
+
+## Example: Handler Signature Types
+
+Here's a complete example showing both handler signature types in action:
+
+```python
+from core.workflow import Workflow
+from core.task import DirectHandlerTask
+
+# Single-parameter handler (simple form)
+def simple_handler(input_data):
+    """Handler that takes a single input_data parameter."""
+    value = input_data.get("value", 0)
+    return {
+        "success": True,
+        "result": value * 2
+    }
+
+# Two-parameter handler (advanced form)
+def advanced_handler(task, input_data):
+    """Handler that takes both task and input_data parameters."""
+    # Access task properties directly
+    task_id = task.id
+    
+    # Process input data
+    name = input_data.get("name", "unknown")
+    
+    # Return result with task metadata
+    return {
+        "success": True,
+        "result": f"Processed {name} in task {task_id}",
+        "metadata": {
+            "task_id": task_id,
+            "task_name": task.name,
+            "input_length": len(name)
+        }
+    }
+
+# Create workflow
+workflow = Workflow(workflow_id="handler_example", name="Handler Example Workflow")
+
+# Add task with simple handler
+simple_task = DirectHandlerTask(
+    task_id="simple_task",
+    name="Simple Handler Task",
+    handler=simple_handler,
+    input_data={"value": 21}
+)
+workflow.add_task(simple_task)
+
+# Add task with advanced handler
+advanced_task = DirectHandlerTask(
+    task_id="advanced_task",
+    name="Advanced Handler Task",
+    handler=advanced_handler,
+    input_data={"name": "User"},
+    depends_on=["simple_task"]  # Run after simple_task
+)
+workflow.add_task(advanced_task)
+
+# Execute workflow
+# ... 

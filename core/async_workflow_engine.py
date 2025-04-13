@@ -18,7 +18,7 @@ from core.llm.interface import LLMInterface
 from core.task import Task
 from core.task_execution_strategy import TaskExecutionStrategyFactory
 from core.tools.registry import ToolRegistry
-from core.tools.handler_registry import HandlerRegistry
+from core.handlers.registry import HandlerRegistry
 
 # Assuming logger setup is done elsewhere and functions are imported
 from core.utils.logger import (  # Keep imports

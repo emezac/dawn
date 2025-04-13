@@ -12,8 +12,11 @@ from typing import Any, Dict, Type, Callable, Optional
 from core.llm.interface import LLMInterface
 from core.task import Task
 from core.tools.registry import ToolRegistry
-from core.tools.handler_registry import HandlerRegistry
+from core.handlers.registry import HandlerRegistry
 from core.utils.logger import log_error, log_info
+from core.errors import ErrorCode, DawnError
+from core.tools.registry_access import execute_tool, get_registry as get_tool_registry
+from core.services import get_services
 
 
 class TaskExecutionStrategy(ABC):

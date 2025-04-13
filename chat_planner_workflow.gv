@@ -1,0 +1,108 @@
+digraph {
+	graph [bb="0,0,545.5,539",
+		fontsize=20,
+		label="Workflow: Chat-Driven Planning Workflow (ID: chat_planner_v1)",
+		lheight=0.31,
+		lp="272.75,15.25",
+		lwidth=7.35,
+		rankdir=TB
+	];
+	node [label="\N"];
+	get_capabilities	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: get_capabilities
+Name: Get Available Tools and Handlers",
+		pos="371.56,518.5",
+		shape=box,
+		style=filled,
+		width=3.3368];
+	think_analyze_plan	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: think_analyze_plan
+Name: Generate Execution Plan",
+		pos="371.56,425",
+		shape=box,
+		style=filled,
+		width=2.6597];
+	get_capabilities -> think_analyze_plan	[color=green,
+		label=" on_success",
+		lp="403.81,471.75",
+		pos="e,371.56,445.82 371.56,497.65 371.56,485.78 371.56,470.44 371.56,457",
+		style=dashed];
+	validate_plan	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: validate_plan
+Name: Validate Generated Plan",
+		pos="371.56,331.5",
+		shape=box,
+		style=filled,
+		width=2.5972];
+	think_analyze_plan -> validate_plan	[color=green,
+		label=" on_success",
+		lp="403.81,378.25",
+		pos="e,371.56,352.32 371.56,404.15 371.56,392.28 371.56,376.94 371.56,363.5",
+		style=dashed];
+	generate_tasks	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: generate_tasks
+Name: Generate Tasks From Plan",
+		pos="306.56,238",
+		shape=box,
+		style=filled,
+		width=2.7951];
+	validate_plan -> generate_tasks	[color=green,
+		label=" on_success",
+		lp="377.13,284.75",
+		pos="e,320.64,258.82 357.46,310.65 348.6,298.18 337.02,281.88 327.15,267.98",
+		style=dashed];
+	handle_plan_failure	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: handle_plan_failure
+Name: Handle Plan Generation/Validation Failure",
+		pos="392.56,51",
+		shape=box,
+		style=filled,
+		width=4.0035];
+	validate_plan -> handle_plan_failure	[color=red,
+		label=" on_failure",
+		lp="455.3,191.25",
+		pos="e,402.96,71.848 399.72,310.8 405.18,305.65 410.24,299.64 413.56,293 420.46,279.24 415.48,273.85 416.56,258.5 420.75,198.83 432.94,\
+182.73 421.56,124 418.81,109.78 413.25,94.802 407.73,82.215",
+		style=dashed];
+	execute_dynamic_tasks	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: execute_dynamic_tasks
+Name: Execute Generated Tasks (Simulation)",
+		pos="179.56,144.5",
+		shape=box,
+		style=filled,
+		width=3.7014];
+	generate_tasks -> execute_dynamic_tasks	[color=green,
+		label=" on_success",
+		lp="286.69,191.25",
+		pos="e,207.07,165.32 279.01,217.15 260.62,203.9 236.23,186.33 216.21,171.9",
+		style=dashed];
+	generate_tasks -> handle_plan_failure	[color=red,
+		label=" on_failure",
+		lp="387.74,144.5",
+		pos="e,383.3,71.936 315.77,217.2 330.86,184.74 360.95,120.01 378.65,81.922",
+		style=dashed];
+	summarize_results	[fillcolor=lightgrey,
+		height=0.56944,
+		label="ID: summarize_results
+Name: Summarize Execution Results",
+		pos="119.56,51",
+		shape=box,
+		style=filled,
+		width=3.0764];
+	execute_dynamic_tasks -> summarize_results	[color=green,
+		label=" on_success",
+		lp="187.19,97.75",
+		pos="e,132.56,71.815 166.54,123.65 158.45,111.3 147.89,95.192 138.83,81.381",
+		style=dashed];
+	execute_dynamic_tasks -> handle_plan_failure	[color=red,
+		label=" on_failure",
+		lp="304.94,97.75",
+		pos="e,322.26,71.911 211.08,123.57 229.36,112.56 253.1,99.195 275.31,89.5 286.83,84.475 299.23,79.78 311.52,75.529",
+		style=dashed];
+}
