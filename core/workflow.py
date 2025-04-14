@@ -184,3 +184,15 @@ class Workflow:
     def __repr__(self) -> str:
         """String representation of the workflow."""
         return f"Workflow(id={self.id}, name={self.name}, status={self.status}, tasks={len(self.tasks)})"
+
+    def set_tool_registry(self, tool_registry):
+        """
+        Set a tool registry for all tasks in the workflow.
+        This is mainly used for backward compatibility with tests.
+        
+        Args:
+            tool_registry: The tool registry to use
+        """
+        for task in self.tasks.values():
+            if hasattr(task, 'set_tool_registry'):
+                task.set_tool_registry(tool_registry)

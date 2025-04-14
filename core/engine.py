@@ -403,9 +403,14 @@ class WorkflowEngine:
                     log_info(f"Engine: Executing LLM task '{current_task.id}'")
                     prompt = resolved_input.get("prompt", "")
                     if not prompt: raise ValueError("Missing 'prompt' for LLM task.")
+                    
+                    # Create a copy of resolved_input without the prompt key to avoid passing it twice
+                    other_params = resolved_input.copy()
+                    other_params.pop("prompt", None)
+                    
                     output = self.llm_interface.execute_llm_call(
                         prompt=prompt, # Pass required args
-                        **resolved_input # Pass other resolved inputs as potential kwargs
+                        **other_params # Pass other resolved inputs as potential kwargs
                         # TODO: Map specific LLM args if needed, like temperature etc.
                     )
 
@@ -533,3 +538,43 @@ class WorkflowEngine:
             self.error_context = ErrorContext(workflow_id=workflow.id) # Reset error context too
             log_info(f"WorkflowEngine switched to execute new workflow '{workflow.name}' (ID: {workflow.id})")
         return self.run(initial_input=initial_input)
+        
+    def execute_task(self, task):
+        """
+        Execute a single task for testing purposes.
+        
+        This method is provided for backward compatibility with tests.
+        In production code, use run() which executes full workflows.
+        
+        Args:
+            task: The task to execute
+            
+        Returns:
+            bool: True if task executed successfully, False otherwise
+        """
+        try:
+            log_info(f"Executing single task '{task.id}' for testing purposes")
+            
+            # Resolve inputs
+            resolved_input = self.process_task_input(task)
+            task.set_status("running")
+            
+            # Execute based on type
+            if isinstance(task, DirectHandlerTask) and callable(task.handler):
+                output = task.execute(resolved_input)
+            elif getattr(task, 'is_llm_task', False):
+                output = self.llm_interface.execute_llm_call(prompt=resolved_input.get("prompt", ""))
+            elif task.tool_name:
+                output = self.tool_registry.execute_tool(task.tool_name, resolved_input)
+            else:
+                raise ValueError(f"Task '{task.id}' has unknown execution type")
+                
+            # Process output
+            task.set_output(output)
+            success = task.output_data.get('success', False)
+            
+            return success
+        except Exception as e:
+            log_error(f"Error executing task '{task.id}': {e}")
+            task.set_output({"success": False, "error": str(e), "status": "failed"})
+            return False

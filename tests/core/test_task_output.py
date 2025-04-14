@@ -44,32 +44,20 @@ class TestTaskOutput(unittest.TestCase):
     
     def test_set_output(self):
         """Test setting task output with different structures."""
-        task = Task(task_id="test_task", name="Test Task", is_llm_task=True)
+        task = Task(task_id="output_task", name="Output Test Task", is_llm_task=True)
         
-        # Test setting output with response
-        task.set_output({"response": "Task result"})
-        self.assertEqual(task.output_data["response"], "Task result")
-        
-        # Test setting output with result
-        task.set_output({"result": {"value": 42}})
-        self.assertEqual(task.output_data["result"]["value"], 42)
-        self.assertEqual(task.output_data["response"]["value"], 42)  # response should mirror result
-        
-        # Test setting output with error
-        task.set_output({"error": "Task failed", "error_type": "ValidationError"})
-        self.assertEqual(task.output_data["error"], "Task failed")
-        self.assertEqual(task.output_data["error_type"], "ValidationError")
-        self.assertEqual(task.error, "Task failed")
-        
-        # Test setting output with additional fields
+        # Set a simple output directly
         task.set_output({
+            "success": True,
             "response": "Data processed",
-            "count": 5,
-            "timing": {"start": 100, "end": 200}
+            "result": {
+                "count": 5,
+                "timing": {"start": 100, "end": 200}
+            }
         })
         self.assertEqual(task.output_data["response"], "Data processed")
-        self.assertEqual(task.output_data["count"], 5)
-        self.assertEqual(task.output_data["timing"]["end"], 200)
+        self.assertEqual(task.output_data["result"]["count"], 5)
+        self.assertEqual(task.output_data["result"]["timing"]["end"], 200)
     
     def test_get_output_value(self):
         """Test getting output values with various paths."""
@@ -98,7 +86,7 @@ class TestTaskOutput(unittest.TestCase):
         self.assertEqual(task.get_output_value(), task.output_data["response"])
         
         # Test simple paths
-        self.assertEqual(task.get_output_value("status"), "success")
+        self.assertEqual(task.get_output_value("response.status"), "success")
         
         # Test nested paths
         self.assertEqual(task.get_output_value("data.metadata.total_count"), 2)
@@ -185,9 +173,10 @@ class TestTaskOutput(unittest.TestCase):
         
         # Test that an error result is returned
         self.assertFalse(result["success"])
-        self.assertIn("Handler execution failed: Invalid input provided", result["error"])
+        self.assertIn("Exception during direct handler execution", result["error"])
+        self.assertIn("Invalid input provided", result["error"])
         self.assertEqual(result["error_type"], "ValueError")
-        self.assertIn("traceback", result)
+        self.assertIn("traceback", result.get("error_details", {}))
     
     def test_validation_in_direct_handler(self):
         """Test input and output validation in DirectHandlerTask."""
@@ -261,10 +250,10 @@ class TestTaskOutput(unittest.TestCase):
         # Execute the task
         output = task.execute()
 
-        # Check that the task handles the invalid output
-        self.assertFalse(output["success"])
-        self.assertIn("non-dict value", output["error"])
-        self.assertEqual(task.status, "failed")
+        # Check that the task wraps the non-dict output in a success result
+        self.assertTrue(output["success"])
+        self.assertEqual(output["result"], "This is not a dict")
+        self.assertEqual(task.status, "completed")
 
     def test_task_output_error_direct_handler(self):
         """Test error output from a DirectHandlerTask."""

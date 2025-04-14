@@ -21,10 +21,10 @@ if project_root not in sys.path:
 try:
     from examples.chat_planner_workflow import (
         validate_plan_handler, # Still used for LLM interaction tests
-        validate_plan_with_llm,
-        attempt_json_recovery,
         PLAN_SCHEMA,
-        format_validation_errors_for_user
+        format_validation_errors_for_user,
+        attempt_json_recovery,
+        validate_plan_with_llm
     )
     from core.task import DirectHandlerTask
     from core.llm.interface import LLMInterface
@@ -252,7 +252,7 @@ def simulate_fixed_validate_plan_handler(task: DirectHandlerTask, input_data: di
         if llm_attempted and not llm_provided_plan: final_result_data["validation_warnings"].append("LLM validation/fix attempt failed.")
         return {"success": True, "result": final_result_data}
     else:
-        final_result_data["formatted_errors"] = format_validation_errors_for_user(validation_errors, error_summary, raw_plan_output)
+        final_result_data["formatted_errors"] = format_validation_errors_for_user(validation_errors, validation_warnings)
         return {"success": False, "error": "Plan validation failed", "validation_errors": validation_errors, "result": final_result_data}
 
 
@@ -404,14 +404,19 @@ class TestPlanValidation(unittest.TestCase):
     @patch('examples.chat_planner_workflow.validate_plan_with_llm')
     def test_llm_assisted_validation_called_on_failure(self, mock_validate_with_llm):
         logger.debug("Running test_llm_assisted_validation_called_on_failure")
-        fixed_plan_list = json.loads(VALID_PLAN_JSON)
-        mock_validate_with_llm.return_value = fixed_plan_list
+        # This test has been modified since LLM validation was removed (Option B)
+        # We now just check that validation fails properly without LLM assistance
+        
         config_set("chat_planner.validation_strictness", "high")
         result = validate_plan_handler(self.mock_task, {"raw_llm_output": SCHEMA_ERROR_PLAN, "tool_details": self.tool_details, "handler_details": self.handler_details, "user_request": ""})
-        mock_validate_with_llm.assert_called_once()
-        self.assertTrue(result["success"])
-        self.assertTrue(result["result"].get("fixed_by_llm", False))
-        self.assertEqual(result["result"]["validated_plan"], fixed_plan_list)
+        
+        # LLM validation isn't called anymore (Option B)
+        mock_validate_with_llm.assert_not_called()
+        
+        # The validation should now fail since there's no LLM to fix it
+        self.assertFalse(result["success"])
+        self.assertTrue(result["validation_errors"])
+        # No fixed_by_llm or validated_by_llm fields since LLM validation was removed
 
     def test_llm_validation_function(self):
         logger.debug("Running test_llm_validation_function")

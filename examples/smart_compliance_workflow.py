@@ -114,11 +114,12 @@ WORKFLOW_INPUT = {
 }
 
 
-def log_alert_handler(input_data: Dict[str, str]) -> Dict[str, Any]:
+def log_alert_handler(task, input_data: Dict[str, str]) -> Dict[str, Any]:
     """
     Log critical compliance alerts (simulated).
 
     Args:
+        task: The task object
         input_data: Dictionary containing the message to log
 
     Returns:
@@ -133,11 +134,12 @@ def log_alert_handler(input_data: Dict[str, str]) -> Dict[str, Any]:
 # Add a global semaphore to track if info has been logged
 LOG_INFO_EXECUTED = False
 
-def log_info_handler(input_data: Dict[str, str]) -> Dict[str, Any]:
+def log_info_handler(task, input_data: Dict[str, str]) -> Dict[str, Any]:
     """
     Log informational compliance messages (simulated) with execution protection.
 
     Args:
+        task: The task object
         input_data: Dictionary containing the message to log
 
     Returns:
@@ -422,7 +424,7 @@ def build_compliance_check_workflow(
     workflow.add_task(task1)
 
     # NEW Task: Parse JSON Output (Using DirectHandlerTask)
-    def parse_llm_json_output(input_data):
+    def parse_llm_json_output(task, input_data):
         """Parse JSON output from LLM task"""
         llm_output_value = input_data.get("llm_output") # Get the resolved value
         
@@ -571,7 +573,7 @@ def build_compliance_check_workflow(
     workflow.add_task(task4_parse)
 
     # Task 5: Check if Alert is Required (Using DirectHandlerTask)
-    def check_alert_needed(input_data):
+    def check_alert_needed(task, input_data):
         """Check if an alert is needed based on evaluation"""
         print(f"DEBUG check_alert_needed - Input type: {type(input_data)}")
         print(f"DEBUG check_alert_needed - Input data: {str(input_data)[:100]}...")

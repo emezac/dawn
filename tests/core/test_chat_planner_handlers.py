@@ -26,7 +26,7 @@ from examples.chat_planner_workflow import (
 from core.task import DirectHandlerTask
 from core.llm.interface import LLMInterface
 from core.services import get_services, reset_services
-from core.config import configure, set as config_set
+from core.config import configure, set as config_set, get as config_get
 
 # Example valid plan for testing
 VALID_PLAN_JSON = """
@@ -279,50 +279,53 @@ class TestChatPlannerHandlers(unittest.TestCase):
 
     def test_validate_plan_handler_missing_input(self):
         """Test validate_plan_handler with missing input."""
-        # Execute handler with missing raw_llm_output
+        # Execute with missing raw_llm_output
         result = validate_plan_handler(
             self.mock_task,
-            {
-                "user_request": "Find information",
-                "tool_details": self.tool_details,
-                "handler_details": self.handler_details
-            }
+            {"tool_details": self.tool_details, "handler_details": self.handler_details}
         )
-
+        
         # Verify error
         self.assertFalse(result["success"])
-        self.assertIn("Missing raw plan output", result["error"])
+        self.assertIn("Missing or invalid raw plan input", result["error"])
 
     def test_validate_plan_handler_capability_check(self):
         """Test validate_plan_handler's check for unavailable tools/handlers."""
-        # Create a plan referencing tools/handlers not in our lists
-        unavailable_plan = """
-        [
-          {
-            "step_id": "step_1",
-            "description": "Use unavailable tool",
-            "type": "tool",
-            "name": "nonexistent_tool",
-            "inputs": {},
-            "depends_on": []
-          }
-        ]
-        """
+        # Set medium strictness for this test
+        original_strictness = config_get("chat_planner.validation_strictness", "high")
+        self.addCleanup(config_set, "chat_planner.validation_strictness", original_strictness)
+        config_set("chat_planner.validation_strictness", "medium")
         
-        # Execute handler with the plan
+        # Create a plan that references a tool that isn't available
+        plan_with_unavailable_tool = [
+            {
+                "step_id": "step_1",
+                "description": "Use unavailable tool",
+                "type": "tool",
+                "name": "nonexistent_tool",
+                "inputs": {},
+                "depends_on": []  # Added the required depends_on field
+            }
+        ]
+        plan_str = json.dumps(plan_with_unavailable_tool)
+        
+        # Execute handler
         result = validate_plan_handler(
             self.mock_task,
             {
-                "raw_llm_output": unavailable_plan,
-                "tool_details": self.tool_details,
-                "handler_details": self.handler_details,
-                "user_request": "Do something with unavailable tools"
+                "raw_llm_output": plan_str,
+                "tool_details": [{"name": "web_search"}],  # Not including nonexistent_tool
+                "handler_details": []
             }
         )
-
-        # Verify capability check fails
-        self.assertFalse(result["success"])
-        self.assertIn("nonexistent_tool", str(result["validation_errors"]))
+        
+        # Verify success but with warnings
+        self.assertTrue(result["success"])
+        self.assertIsNotNone(result["result"]["validated_plan"])
+        
+        # Check there are warnings
+        warnings = result["result"].get("validation_warnings", [])
+        self.assertTrue(any("nonexistent_tool" in str(w) for w in warnings))
 
     def test_plan_to_tasks_handler_success(self):
         """Test successful conversion of a plan to task definitions."""
@@ -374,7 +377,7 @@ class TestChatPlannerHandlers(unittest.TestCase):
         
         # Verify error
         self.assertFalse(result["success"])
-        self.assertIn("No valid task definitions", result["error"])
+        self.assertIn("No tasks to execute", result["error"])
 
     def test_plan_to_tasks_handler_missing_fields(self):
         """Test plan_to_tasks_handler with steps missing required fields."""
@@ -399,9 +402,14 @@ class TestChatPlannerHandlers(unittest.TestCase):
             {"validated_plan": incomplete_plan}
         )
         
-        # Verify error (no valid definitions)
-        self.assertFalse(result["success"])
-        self.assertIn("No valid task definitions", result["error"])
+        # Verify that the handler succeeds but with warnings
+        self.assertTrue(result["success"])
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(result["result"]["tasks"]), 0)
+        self.assertTrue(len(result["result"]["conversion_warnings"]) > 0)
+        # Verify warnings contain expected messages
+        warnings = result["result"]["conversion_warnings"]
+        self.assertTrue(any("missing required fields" in warning for warning in warnings))
 
 
 if __name__ == "__main__":

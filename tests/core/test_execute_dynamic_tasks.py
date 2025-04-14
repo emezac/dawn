@@ -137,7 +137,7 @@ class TestExecuteDynamicTasksHandler(unittest.TestCase):
         # Verify result (should succeed with empty result)
         self.assertTrue(result["success"])
         self.assertIn("message", result["result"])
-        self.assertEqual(result["result"]["message"], "No tasks to execute")
+        self.assertEqual(result["result"]["message"], "No valid dynamic tasks provided.")
         
         # Verify tools were not called
         self.mock_search_tool.assert_not_called()

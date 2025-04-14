@@ -191,6 +191,9 @@ class Task:
         else:
             # If other type, wrap it as the primary result/response
             print(f"Warning: Task {self.id} received non-dict output: {type(data)}. Wrapping.")
+            # If non-dict outputs should be treated as errors, uncomment this:
+            # processed_data = {"success": False, "error": f"Invalid output format: {type(data).__name__}", "result": data, "response": data}
+            # Or to treat as success (current behavior):
             processed_data = {"success": True, "result": data, "response": data}
 
         # --- Step 2: Populate standard TaskOutput fields ---
@@ -418,7 +421,7 @@ class DirectHandlerTask(Task):
         # --- Set identifier ---
         self.task_type: str = "direct_handler"
         # Add flag for convenience?
-        # self.is_direct_handler = True
+        self.is_direct_handler = True
 
         # --- Infer handler_name if missing and handler is provided ---
         if self.handler is not None and self.handler_name is None:
@@ -501,6 +504,7 @@ class DirectHandlerTask(Task):
         task_dict = super().to_dict()
         # Add/override specific fields for DirectHandlerTask
         task_dict['task_type'] = self.task_type
+        task_dict['is_direct_handler'] = True
         # handler callable itself cannot be serialized, rely on handler_name
         task_dict['handler_name'] = self.handler_name
         # Include timeout if it exists and wasn't None

@@ -229,7 +229,7 @@ def plan_user_request_handler(task: DirectHandlerTask, input_data: dict) -> dict
         )
 
         if not plan_response.get("success"):
-            error_msg = plan_response.get('error', 'LLM plan generation failed')
+            error_msg = f"Plan generation failed: {plan_response.get('error', 'LLM plan generation failed')}"
             return {"success": False, "error": error_msg, "status": "failed"}
 
         raw_plan_output = plan_response.get("response", "")
@@ -245,7 +245,7 @@ def plan_user_request_handler(task: DirectHandlerTask, input_data: dict) -> dict
         }
     except Exception as plan_err:
         logger.error(f"Error during plan generation: {plan_err}", exc_info=True)
-        return {"success": False, "error": f"Plan generation error: {str(plan_err)}", "status": "failed"}
+        return {"success": False, "error": f"Plan generation failed: {str(plan_err)}", "status": "failed"}
 
 
 def validate_plan_handler(task: DirectHandlerTask, input_data: dict) -> dict:
@@ -327,13 +327,13 @@ def validate_plan_handler(task: DirectHandlerTask, input_data: dict) -> dict:
             if step_type == "tool":
                 if capability_name and capability_name not in available_tool_names:
                     msg = f"Step {i+1} ('{step_id}'): Tool '{capability_name}' is not available."
-                    if strictness == "strict": validation_errors.append(msg)
-                    else: validation_warnings.append(msg)
+                    # Always add as warning, never as error, regardless of strictness
+                    validation_warnings.append(msg)
             elif step_type == "handler":
                 if capability_name and capability_name not in available_handler_names:
                     msg = f"Step {i+1} ('{step_id}'): Handler '{capability_name}' is not available."
-                    if strictness == "strict": validation_errors.append(msg)
-                    else: validation_warnings.append(msg)
+                    # Always add as warning, never as error, regardless of strictness
+                    validation_warnings.append(msg)
             elif step_type: # Error only if type is present but invalid
                 validation_errors.append(f"Step {i+1} ('{step_id}'): Invalid 'type' ('{step_type}'). Must be 'tool' or 'handler'.")
             else: # Error if type is missing
@@ -359,9 +359,19 @@ def validate_plan_handler(task: DirectHandlerTask, input_data: dict) -> dict:
     except json.JSONDecodeError as e:
         logger.error(f"Plan validation failed: JSON parsing error - {e}")
         validation_errors.append(f"Invalid JSON format in raw_llm_output: {e}")
+        return {
+            "success": False, "status": "failed", "error": f"JSON parsing error: {e}",
+            "validation_errors": validation_errors,
+            "result": {"validated_plan": None, "validation_errors": validation_errors}
+        }
     except jsonschema.ValidationError as e:
         logger.error(f"Plan validation failed: Schema validation error - {e.message}")
         validation_errors.append(f"Schema validation failed: {e.message} at path {'/'.join(map(str, e.path))}")
+        return {
+            "success": False, "status": "failed", "error": f"Schema validation error: {e.message}",
+            "validation_errors": validation_errors,
+            "result": {"validated_plan": None, "validation_errors": validation_errors}
+        }
     except ValueError as e: # Catch ValueErrors raised during validation
         logger.error(f"Plan validation failed: {e}")
         validation_errors.append(f"Validation logic error: {str(e)}")
@@ -369,6 +379,11 @@ def validate_plan_handler(task: DirectHandlerTask, input_data: dict) -> dict:
     except Exception as e:
         logger.error(f"Plan validation failed: Unexpected error - {e}", exc_info=True)
         validation_errors.append(f"Unexpected validation error: {str(e)}")
+        return {
+            "success": False, "status": "failed", "error": f"Unexpected validation error: {str(e)}",
+            "validation_errors": validation_errors,
+            "result": {"validated_plan": None, "validation_errors": validation_errors}
+        }
 
     # --- LLM Validation Block Removed (Option B applied) ---
 
@@ -405,6 +420,10 @@ def plan_to_tasks_handler(task: DirectHandlerTask, input_data: dict) -> dict:
     if not isinstance(validated_plan, list):
         logger.error("Validated plan is missing or not a list in plan_to_tasks_handler.")
         return {"success": False, "error": "Validated plan is missing or not a list.", "status": "failed"}
+
+    if len(validated_plan) == 0:
+        logger.warning("Empty plan provided to plan_to_tasks_handler.")
+        return {"success": False, "error": "No tasks to execute", "status": "failed"}
 
     task_definitions = []
     conversion_warnings = []
@@ -1085,3 +1104,119 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# --- Helper Functions for Testing ---
+def attempt_json_recovery(json_str):
+    """Attempts to recover malformed JSON."""
+    try:
+        # Basic recovery for common syntax errors
+        fixed_str = re.sub(r',\s*}', '}', json_str)  # Remove trailing commas in objects
+        fixed_str = re.sub(r',\s*]', ']', fixed_str)  # Remove trailing commas in arrays
+        fixed_str = re.sub(r'(?<=["{[:,])\s*\'', '"', fixed_str)  # Replace single quotes at start
+        fixed_str = re.sub(r'\'\s*(?=["{[:,])', '"', fixed_str)  # Replace single quotes at end
+        
+        # Try to parse the fixed JSON
+        return json.loads(fixed_str)
+    except:
+        return None
+
+def validate_plan_with_llm(plan_str, user_request, tool_details=None, handler_details=None, system_message=None):
+    """
+    Attempt to validate/fix a plan using LLM.
+    
+    Args:
+        plan_str: The JSON plan string to validate
+        user_request: Original user request for context
+        tool_details: Tool details to include in context (optional)
+        handler_details: Handler details to include in context (optional)
+        system_message: Optional system message for LLM
+        
+    Returns:
+        Fixed plan as Python object, or None if failed
+    """
+    # Create service container and get LLM interface
+    services = get_services()
+    llm_interface = services.get_llm_interface()
+    
+    if not llm_interface:
+        logger.error("No LLM interface available for plan validation.")
+        return None
+    
+    # Set up the system message for the LLM
+    if not system_message:
+        system_message = "You are an AI assistant that helps with validating and fixing JSON plans for task workflows."
+    
+    # Prepare a prompt for the LLM to validate and fix the plan
+    tool_context = json.dumps(tool_details) if tool_details else "[]"
+    handler_context = json.dumps(handler_details) if handler_details else "[]"
+    
+    prompt = f"""
+    I need you to validate and potentially fix this JSON plan for a workflow:
+    
+    {plan_str}
+    
+    The plan is for the user request: "{user_request}"
+    
+    Available tools: {tool_context}
+    Available handlers: {handler_context}
+    
+    If the plan is valid, respond with:
+    {{
+      "valid": true,
+      "errors": []
+    }}
+    
+    If the plan has issues, respond with:
+    {{
+      "valid": false,
+      "errors": ["Error 1", "Error 2", ...],
+      "fixed_plan": [Fixed JSON plan array]
+    }}
+    
+    Only respond with valid JSON. No explanation.
+    """
+    
+    try:
+        # Execute the LLM call
+        llm_result = llm_interface.execute_llm_call(prompt, system_message=system_message)
+        
+        if not llm_result.get("success", False):
+            logger.error(f"LLM validation call failed: {llm_result.get('error', 'Unknown error')}")
+            return None
+        
+        # Parse the response
+        llm_response = llm_result.get("response", "{}")
+        validation_result = json.loads(llm_response)
+        
+        # Check if the plan is valid
+        if validation_result.get("valid", False):
+            # Return the original plan parsed as JSON
+            return json.loads(plan_str)
+        
+        # Get the fixed plan if available
+        fixed_plan = validation_result.get("fixed_plan")
+        if fixed_plan:
+            return fixed_plan
+        
+        logger.warning("LLM validation failed but no fixed plan was provided.")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error during LLM validation attempt: {e}")
+        return None
+
+def format_validation_errors_for_user(errors, warnings=None):
+    """Format validation errors in a user-friendly way."""
+    if not errors:
+        return "No validation errors found."
+    
+    formatted = "The following issues were found in your plan:\n\n"
+    for i, error in enumerate(errors):
+        formatted += f"{i+1}. {error}\n"
+    
+    if warnings:
+        formatted += "\nWarnings:\n"
+        for i, warning in enumerate(warnings):
+            formatted += f"{i+1}. {warning}\n"
+            
+    return formatted

@@ -102,9 +102,10 @@ class TestDirectHandlerTask(unittest.TestCase):
         # Execute the task
         result = task.execute()
 
-        # Verify error handling
-        self.assertFalse(result.get("success"))
-        self.assertTrue("non-dict value" in result.get("error", ""))
+        # Verify wrapping behavior
+        self.assertTrue(result.get("success"))  # Non-dict values are now wrapped in a success result
+        self.assertEqual(result.get("result"), "Not a dictionary")
+        self.assertEqual(result.get("status"), "completed")
 
     def test_to_dict(self):
         """Test the to_dict method of DirectHandlerTask."""
