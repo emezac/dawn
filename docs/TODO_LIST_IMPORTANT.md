@@ -79,16 +79,16 @@ This list outlines the key tasks required to implement a workflow that takes nat
 -   [x] **Documentation:**
     -   [X] Create documentation for the new workflow (`chat_planner_workflow.md`).
     -   [X] Document the "Think & Analyze" component (`ThinkAnalyzeTask` or handler).
-    -   [ ] Document the `PlanToTasksHandler`.
+    -   [X] Document the `PlanToTasksHandler`.
     -   [X] Document the Plan Schema Validation (`plan_schema_validation.md`).
     -   [X] Create comprehensive implementation overview (`chat_planner_implementation.md`).
     -   [X] Update `README.md` with usage examples.
 -   [ ] **Testing:**
     -   [X] Unit tests for new handlers/tasks (`ThinkAnalyzeTask`, `PlanToTasksHandler`, etc.).
     -   [X] Unit tests for the plan validation logic. (All tests passing as of latest fixes)
-    -   [ ] Integration tests for the end-to-end chat -> plan -> execute workflow.
-    -   [ ] Test various chat inputs (simple, complex, ambiguous).
-    -   [ ] Test error handling scenarios.
+    -   [X] Integration tests for the end-to-end chat -> plan -> execute workflow.
+    -   [X] Test various chat inputs (simple, complex, ambiguous).
+    -   [X] Test error handling scenarios.
 
 ## Phase 6: Advanced Features & Considerations (Suggestions)
 

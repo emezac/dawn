@@ -90,6 +90,8 @@ class ErrorCode:
     # Unknown/uncategorized errors (900-999)
     UNKNOWN_ERROR = "UNKNOWN_ERROR_901"
 
+    TASK_EXECUTION_FAILED = "TASK_EXECUTION_FAILED_201"
+
 
 class DawnError(Exception):
     """Base exception class for all framework errors."""  # noqa: D202

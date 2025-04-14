@@ -23,6 +23,9 @@ from core.task import DirectHandlerTask
 from core.services import get_services, reset_services
 from core.tools.registry import ToolRegistry
 from core.handlers.registry import HandlerRegistry
+from core.engine import WorkflowEngine
+from core.workflow import Workflow
+from core.llm.interface import LLMInterface
 
 
 class TestExecuteDynamicTasksHandler(unittest.TestCase):
@@ -53,6 +56,19 @@ class TestExecuteDynamicTasksHandler(unittest.TestCase):
         self.mock_task = MagicMock(spec=DirectHandlerTask)
         self.mock_task.id = "execute_dynamic_tasks"
         self.mock_task.name = "Execute Dynamic Tasks"
+        
+        # Initialize mock LLM interface
+        self.mock_llm = MagicMock(spec=LLMInterface)
+        
+        # Create a test workflow
+        self.workflow = Workflow(workflow_id="test_workflow", name="Test Workflow")
+        
+        # Initialize WorkflowEngine with required parameters
+        self.engine = WorkflowEngine(
+            workflow=self.workflow,
+            llm_interface=self.mock_llm,
+            tool_registry=self.tool_registry
+        )
         
         # Sample task definitions that would be output from plan_to_tasks_handler
         self.sample_task_defs = [

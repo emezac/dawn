@@ -1,186 +1,300 @@
+#!/usr/bin/env python3
+"""
+Core Task Definition for the Workflow Engine.
+
+Defines the base Task class and specialized task types like DirectHandlerTask.
+"""  # noqa: D202
+
 from typing import Any, Callable, Dict, List, Optional, TypedDict, Union
 import json
+# Imports moved into methods where first used to potentially mitigate import cycles
+# import inspect
+# import traceback
+from core.utils.variable_resolver import resolve_path # Assumed utility
 
-
+# --- TypedDict for Standardized Task Output ---
 class TaskOutput(TypedDict, total=False):
-    """Standard structure for task output data."""  # noqa: D202
-    
-    response: Any  # The main response data
-    result: Any    # Alternative name for response data
-    error: Optional[str]  # Error message if task failed
-    error_type: Optional[str]  # Type of error that occurred
-    error_details: Optional[Dict[str, Any]]  # Additional error details
-    metadata: Optional[Dict[str, Any]]  # Additional metadata about the execution
+    """
+    Standard structure for the primary output dictionary of a task.
+    Uses total=False, so keys are optional.
+    """
+    success: bool          # REQUIRED for handlers to indicate status cleanly
+    status: str            # e.g., "completed", "failed", "skipped"
+    response: Any          # Primary data output, often user-facing or for LLMs
+    result: Any            # Alternative/Alias for primary data output, often programmatic
+    error: Optional[str]   # Error message if task failed
+    error_type: Optional[str] # Type of error (e.g., 'ValueError', 'APIError')
+    error_details: Optional[Dict[str, Any]] # Additional structured error info
+    metadata: Optional[Dict[str, Any]] # Other non-primary results or execution info
 
 
+# --- Base Task Class ---
 class Task:
     """
-    Represents a unit of work within a workflow with properties for status tracking,
-    input/output data, and execution control like retry logic and conditional branching.
+    Represents a fundamental unit of work within a workflow.
+
+    Stores task state, input/output, configuration for execution control
+    (retries, branching), and basic metadata. Intended to be subclassed
+    or used directly for simple tool execution tasks managed by the engine.
     """  # noqa: D202
 
     def __init__(
         self,
         task_id: str,
         name: str,
-        is_llm_task: bool = False,
-        tool_name: Optional[str] = None,
+        # Core execution config
+        tool_name: Optional[str] = None,        # Tool to execute (if not direct handler/LLM)
+        is_llm_task: bool = False,              # Flag for LLM-specific handling
+        # Input/Output
         input_data: Optional[Dict[str, Any]] = None,
-        max_retries: int = 0,
+        # Workflow control
         next_task_id_on_success: Optional[str] = None,
         next_task_id_on_failure: Optional[str] = None,
-        condition: Optional[str] = None,
-        parallel: bool = False,
+        condition: Optional[str] = None,        # Condition string for branching
+        parallel: bool = False,                 # Hint for parallel execution possibility
+        # Error handling
+        max_retries: int = 0,
+        # File Search specific (often for LLM tasks)
         use_file_search: bool = False,
         file_search_vector_store_ids: Optional[List[str]] = None,
         file_search_max_results: int = 5,
+        # Validation flags (implementation specific to engine/handlers)
         validate_input: bool = False,
         validate_output: bool = False,
+        # --- Accept arbitrary keyword arguments ---
+        **kwargs
     ):
+        """
+        Initializes a Task instance.
+
+        Args:
+            task_id: Unique identifier for the task within the workflow.
+            name: Human-readable name for the task.
+            tool_name: Name of the tool registered in the ToolRegistry to execute. Required if not is_llm_task and not overridden by a subclass like DirectHandlerTask.
+            is_llm_task: Set to True if this task involves a call to the LLMInterface.
+            input_data: Static input data or template for dynamic input resolution.
+            next_task_id_on_success: ID of the next task if this one completes successfully.
+            next_task_id_on_failure: ID of the next task if this one fails.
+            condition: A string expression evaluated by the engine to determine branching after success (overrides next_task_id_on_success if condition evaluates to a task ID).
+            parallel: Indicates if the engine might schedule this task in parallel (engine implementation dependent).
+            max_retries: Number of times to retry the task upon failure.
+            use_file_search: Flag to enable file search context injection (typically for LLM tasks).
+            file_search_vector_store_ids: List of vector store IDs to use for file search.
+            file_search_max_results: Maximum number of file search results to inject.
+            validate_input: Flag indicating input validation should be performed.
+            validate_output: Flag indicating output validation should be performed.
+            **kwargs: Catches extra arguments (like 'description', 'output_key') passed by subclasses or workflow definitions.
+        """
         self.id = task_id
         self.name = name
-        self.status = "pending"
-        self.input_data = input_data or {}
-        self.output_data: TaskOutput = {}
-        self.output_annotations = []
-        self.is_llm_task = is_llm_task
-        self.tool_name = tool_name
-        self.retry_count = 0
-        self.max_retries = max_retries
-        self.next_task_id_on_success = next_task_id_on_success
-        self.next_task_id_on_failure = next_task_id_on_failure
-        self.condition = condition
-        self.parallel = parallel
-        self.use_file_search = use_file_search
-        self.file_search_vector_store_ids = file_search_vector_store_ids or []
-        self.file_search_max_results = file_search_max_results
-        self.validate_input = validate_input
-        self.validate_output = validate_output
-        
-        # Error information
-        self.error = None
-        self.error_details = None
+        self.status: str = "pending" # Valid statuses: pending, running, completed, failed, skipped
+        self.input_data: Dict[str, Any] = input_data or {}
+        self.output_data: TaskOutput = {} # Standardized output structure
+        self.output_annotations: List[Any] = [] # For storing annotations from LLMs or tools
 
-        if not self.is_llm_task and not self.tool_name:
-            raise ValueError("Non-LLM tasks must specify a tool_name")
+        # Execution details
+        self.is_llm_task: bool = is_llm_task
+        self.tool_name: Optional[str] = tool_name # Relevant for engine executing tool tasks
+
+        # Workflow control attributes
+        self.next_task_id_on_success: Optional[str] = next_task_id_on_success
+        self.next_task_id_on_failure: Optional[str] = next_task_id_on_failure
+        self.condition: Optional[str] = condition
+        self.parallel: bool = parallel
+
+        # Retry mechanism
+        self.retry_count: int = 0
+        self.max_retries: int = max_retries
+
+        # File Search Context (primarily for LLM tasks)
+        self.use_file_search: bool = use_file_search
+        self.file_search_vector_store_ids: List[str] = file_search_vector_store_ids or []
+        self.file_search_max_results: int = file_search_max_results
+
+        # Validation Flags
+        self.validate_input: bool = validate_input
+        self.validate_output: bool = validate_output
+
+        # Error state storage
+        self.error: Optional[str] = None
+        self.error_details: Optional[Dict[str, Any]] = None # More structured error info
+
+        # --- Store common optional kwargs if provided ---
+        # These are not strictly required by the base Task execution logic
+        # but are useful for definition, UI, and potentially subclasses.
+        self.description: Optional[str] = kwargs.get("description", None)
+        # output_key is more relevant for workflow variable mapping, engine might use it
+        self.output_key: Optional[str] = kwargs.get("output_key", None)
+        # Store depends_on if provided via kwargs (useful for subclasses like DirectHandlerTask)
+        self.depends_on: List[str] = kwargs.get("depends_on", [])
+
+        # --- Placeholder for potentially injected dependencies ---
+        self.tool_registry = None # Engine might inject this
+
+        # --- Basic Validation (Can be expanded) ---
+        # Removed the strict tool_name check here, as subclasses handle their needs.
+        # Engine should validate executable target (tool, handler, LLM) before running.
+
 
     def set_status(self, status: str) -> None:
-        """Set the task status, validating that it's a known status."""
+        """Sets the task status, ensuring it's a valid predefined value."""
         valid_statuses = ["pending", "running", "completed", "failed", "skipped"]
         if status not in valid_statuses:
-            raise ValueError(f"Invalid status: {status}. Must be one of {valid_statuses}")
+            # Log error instead of raising? Or raise? Let's raise for now.
+            raise ValueError(f"Invalid status '{status}' for task '{self.id}'. Must be one of {valid_statuses}")
         self.status = status
 
     def increment_retry(self) -> None:
-        """Increment the retry counter."""
+        """Increments the task's retry counter."""
         self.retry_count += 1
 
     def can_retry(self) -> bool:
-        """Check if the task can be retried based on retry count."""
+        """Checks if the task has remaining retry attempts."""
         return self.retry_count < self.max_retries
 
     def set_input(self, data: Dict[str, Any]) -> None:
-        """Set the input data for the task."""
-        self.input_data = data
+        """
+        Sets the input data for the task. Usually called by the engine
+        after resolving dynamic inputs.
+        """
+        if not isinstance(data, dict):
+             # Handle non-dict input if necessary, maybe wrap it?
+             print(f"Warning: Setting non-dict input for task {self.id}: {type(data)}")
+             self.input_data = {"value": data} # Example: Wrap in a default key
+        else:
+             self.input_data = data
 
-    def set_output(self, data: Dict[str, Any]) -> None:
+    def set_output(self, data: Union[Dict[str, Any], Any]) -> None:
         """
-        Set the output data for the task with standard format.
-        
+        Sets the task's output, standardizing it into the TaskOutput structure.
+
         Args:
-            data: Dictionary containing output data. Should contain either 'response' or 
-                 'result' key for successful tasks, or 'error' for failed tasks.
+            data: The output from the task's execution (tool, handler, LLM).
+                  Can be a dictionary (preferred) or other data type.
         """
-        # Ensure we have a standard structure
         output_data: TaskOutput = {}
-        
-        # Handle response data
-        if "response" in data:
-            output_data["response"] = data["response"]
-        
-        # Handle result data
-        if "result" in data:
-            output_data["result"] = data["result"]
-            if "response" not in output_data:
-                output_data["response"] = data["result"]
-        
-        # Handle error data
-        if "error" in data:
-            output_data["error"] = data["error"]
-            self.error = data["error"]
-            
-            if "error_type" in data:
-                output_data["error_type"] = data["error_type"]
-                
-            if "error_details" in data:
-                output_data["error_details"] = data["error_details"]
-                self.error_details = data["error_details"]
-        
-        # Store any additional data
-        for key, value in data.items():
-            if key not in output_data and key != "annotations":
-                output_data[key] = value
-        
-        # Extract annotations if present
-        self.output_annotations = data.get("annotations", [])
-        
-        # Store the output data
+        processed_data: Dict[str, Any] = {}
+
+        # --- Step 1: Ensure data is a dictionary ---
+        if isinstance(data, dict):
+            processed_data = data.copy() # Work with a copy
+        elif isinstance(data, Exception):
+             # If an exception object was returned, format it as an error
+             import traceback
+             print(f"Task {self.id} output was an exception: {data}")
+             processed_data = {
+                 "success": False,
+                 "error": f"Execution returned exception: {str(data)}",
+                 "error_type": type(data).__name__,
+                 "error_details": {"traceback": traceback.format_exc()}
+             }
+        else:
+            # If other type, wrap it as the primary result/response
+            print(f"Warning: Task {self.id} received non-dict output: {type(data)}. Wrapping.")
+            processed_data = {"success": True, "result": data, "response": data}
+
+        # --- Step 2: Populate standard TaskOutput fields ---
+        output_data['success'] = processed_data.get('success', 'error' not in processed_data) # Infer success
+        output_data['status'] = 'completed' if output_data['success'] else 'failed'
+
+        if 'response' in processed_data:
+            output_data['response'] = processed_data['response']
+        if 'result' in processed_data:
+            output_data['result'] = processed_data['result']
+
+        # Ensure consistency between result & response (prefer response if both exist?)
+        if 'response' in output_data and 'result' not in output_data:
+            output_data['result'] = output_data['response']
+        elif 'result' in output_data and 'response' not in output_data:
+             output_data['response'] = output_data['result']
+        # If neither is set, but success is true, maybe set both to None or {}?
+        elif 'result' not in output_data and 'response' not in output_data and output_data['success']:
+            output_data['result'] = None
+            output_data['response'] = None
+
+
+        if 'error' in processed_data:
+            output_data['error'] = str(processed_data['error']) # Ensure string
+            self.error = output_data['error'] # Store on task too
+        elif not output_data['success'] and 'error' not in output_data:
+             output_data['error'] = "Task failed without specific error message."
+             self.error = output_data['error']
+
+
+        if 'error_type' in processed_data:
+            output_data['error_type'] = processed_data['error_type']
+        if 'error_details' in processed_data:
+            output_data['error_details'] = processed_data['error_details']
+            self.error_details = output_data['error_details'] # Store on task too
+
+        # --- Step 3: Handle metadata and annotations ---
+        output_data['metadata'] = processed_data.get('metadata', {})
+        self.output_annotations = processed_data.get("annotations", [])
+
+        # --- Step 4: Store remaining keys in metadata ---
+        standard_keys = {"success", "status", "response", "result", "error", "error_type", "error_details", "metadata", "annotations"}
+        for key, value in processed_data.items():
+            if key not in standard_keys:
+                 if key not in output_data['metadata']: # Avoid overwriting if already in metadata
+                    output_data['metadata'][key] = value
+
+        # --- Step 5: Assign the standardized output ---
         self.output_data = output_data
-    
+
+        # --- Step 6: Update task status based on final output ---
+        self.set_status(output_data['status'])
+
+
     def get_output_value(self, path: Optional[str] = None, default: Any = None) -> Any:
         """
-        Get a value from the output data by path.
-        
+        Safely retrieves a value from the task's output data using dot notation.
+
         Args:
-            path: Dot notation path to the value (e.g., "result.items[0].name")
-                If None, returns the entire output_data
-            default: Default value to return if path doesn't exist
-            
+            path: Dot-separated path string (e.g., "result.items[0].name", "response.text").
+                  If None or empty, returns the primary 'response' value, falling back to 'result'.
+            default: Value to return if the path is not found or output is empty.
+
         Returns:
-            The value at the specified path, or default if not found
+            The resolved value or the default.
         """
-        if not path:
-            # Return the entire output data
-            if "response" in self.output_data:
-                return self.output_data["response"]
-            elif "result" in self.output_data:
-                return self.output_data["result"]
-            return self.output_data
-        
-        # Use the path resolver
-        from core.utils.variable_resolver import resolve_path
-        
-        try:
-            # Determine which field to use as the root
-            # Prefer response, then result, then the entire output_data
-            if path.startswith("response.") and "response" in self.output_data:
-                root_data = self.output_data["response"]
-                sub_path = path[len("response."):]
-                return resolve_path(root_data, sub_path)
-            elif path.startswith("result.") and "result" in self.output_data:
-                root_data = self.output_data["result"]
-                sub_path = path[len("result."):]
-                return resolve_path(root_data, sub_path)
-            elif "response" in self.output_data:
-                # Try to resolve directly in the response field
-                return resolve_path(self.output_data["response"], path)
-            elif "result" in self.output_data:
-                # Try to resolve directly in the result field
-                return resolve_path(self.output_data["result"], path)
-            else:
-                # Try to resolve in the entire output_data
-                return resolve_path(self.output_data, path)
-        except (KeyError, IndexError, ValueError):
+        if not self.output_data:
             return default
 
+        if not path:
+            # Return primary output field if no path specified
+            return self.output_data.get("response", self.output_data.get("result", default))
+
+        # Use the path resolver utility - import here if needed
+        try:
+            from core.utils.variable_resolver import resolve_path # Assumed utility
+        except ImportError:
+             print("Error: core.utils.variable_resolver.resolve_path not found. Cannot resolve output path.")
+             return default # Or raise?
+
+        try:
+            # Try resolving within the entire output_data dictionary first
+            # This allows accessing metadata, error fields etc. directly (e.g., "metadata.timestamp")
+            return resolve_path(self.output_data, path)
+        except (KeyError, IndexError, TypeError, ValueError):
+            # If direct resolution fails, specifically try resolving within 'response' or 'result'
+            # This handles cases where the path assumes the context is the primary output
+            # e.g., path="items[0].name" should work if output_data['response'] is the list
+            base_data = self.output_data.get("response", self.output_data.get("result"))
+            if base_data is not None:
+                try:
+                     return resolve_path(base_data, path)
+                except (KeyError, IndexError, TypeError, ValueError):
+                     pass # Path not found in base_data either
+            return default # Path not found anywhere
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert the task to a dictionary representation."""
-        return {
+        """Serializes the task object into a dictionary."""
+        task_dict = {
             "task_id": self.id,
             "name": self.name,
             "status": self.status,
             "input_data": self.input_data,
-            "output_data": self.output_data,
+            "output_data": self.output_data, # Serializes the standardized output
             "is_llm_task": self.is_llm_task,
             "tool_name": self.tool_name,
             "retry_count": self.retry_count,
@@ -197,288 +311,322 @@ class Task:
             "error_details": self.error_details,
             "validate_input": self.validate_input,
             "validate_output": self.validate_output,
+            # Include optional fields if they have values
+            "description": self.description,
+            "output_key": self.output_key,
+            "depends_on": self.depends_on,
         }
+         # Add task_type if defined (useful for deserialization/subclass identification)
+        if hasattr(self, 'task_type'):
+            task_dict['task_type'] = self.task_type
+        if hasattr(self, 'handler_name') and self.handler_name: # Add handler_name if present
+            task_dict['handler_name'] = self.handler_name
+
+        # Filter out keys with None values for cleaner output (optional)
+        return {k: v for k, v in task_dict.items() if v is not None and v != []}
+
 
     def __repr__(self) -> str:
-        return f"Task(id={self.id}, name={self.name}, status={self.status})"
+        """Provides a concise string representation of the task."""
+        return f"{self.__class__.__name__}(id='{self.id}', name='{self.name}', status='{self.status}')"
 
     def set_tool_registry(self, tool_registry):
         """
-        Set the tool registry for the task.
-        
+        Injects the ToolRegistry instance. Called by the engine.
+
         Args:
-            tool_registry: Tool registry to use for tool executions
+            tool_registry: The tool registry instance.
         """
         self.tool_registry = tool_registry
 
 
+# --- Direct Handler Task ---
 class DirectHandlerTask(Task):
-    """A task that directly executes a handler function.
-    
-    DirectHandlerTask supports two modes of operation:
-    1. Direct handler function: Pass a Python function directly via the handler parameter
-    2. Registry-based handler: Pass a string name via handler_name parameter that will be looked up in HandlerRegistry
-    
-    At least one of handler or handler_name must be provided. If both are provided,
-    the direct handler function takes precedence.
-    
-    This task type allows for executing arbitrary Python functions without requiring
-    them to be registered as tools, making it useful for simple data transformations,
-    service calls, or other operations that don't need the full tool infrastructure.
+    """
+    A specialized Task that executes a Python callable directly or via registry lookup.
+
+    Useful for simple logic, data transformation, or service calls within the workflow
+    without the overhead of defining a full Tool. The handler function is expected
+    to return a dictionary conforming roughly to the TaskOutput structure.
     """  # noqa: D202
-    
+
     def __init__(
         self,
         task_id: str,
         name: str,
-        handler_name: Optional[str] = None,
-        handler: Optional[Callable] = None,
+        # Handler specification (at least one required)
+        handler: Optional[Callable] = None,        # Direct callable
+        handler_name: Optional[str] = None,      # Name for registry lookup
+        # Standard Task parameters
         input_data: Optional[Dict[str, Any]] = None,
         max_retries: int = 0,
-        depends_on: Optional[List[str]] = None,
-        timeout: Optional[int] = None,
         next_task_id_on_success: Optional[str] = None,
         next_task_id_on_failure: Optional[str] = None,
         condition: Optional[str] = None,
         parallel: bool = False,
-        **kwargs
+        # Specific to handlers/subgraphs - passed via kwargs to Task
+        depends_on: Optional[List[str]] = None, # Dependencies for execution order
+        timeout: Optional[int] = None,         # Execution timeout (engine implementation)
+        **kwargs # Catches description, output_key, etc.
     ):
-        """Initialize a DirectHandlerTask.
-        
-        Args:
-            task_id: Unique identifier for the task
-            name: Descriptive name for the task
-            handler_name: The name of the handler function to execute (required if handler not provided)
-            handler: The handler function to execute directly (if provided, takes precedence over handler_name)
-            input_data: Input data for the task
-            max_retries: Maximum number of retry attempts for the task
-            depends_on: IDs of tasks that must complete before this task (not used by Task class)
-            timeout: Maximum execution time in seconds (not used by Task class)
-            next_task_id_on_success: Task ID to execute if this task succeeds
-            next_task_id_on_failure: Task ID to execute if this task fails
-            condition: Optional condition to evaluate to determine next task
-            parallel: Whether this task can be executed in parallel with others
-            **kwargs: Additional task parameters
         """
-        # Ensure at least one of handler or handler_name is provided
+        Initializes a DirectHandlerTask.
+
+        Args:
+            task_id: Unique task identifier.
+            name: Human-readable task name.
+            handler: The Python function/callable to execute directly. Takes precedence over handler_name.
+            handler_name: The string name used to look up the handler function in the HandlerRegistry. Required if 'handler' is not provided.
+            input_data: Input data dictionary or template.
+            max_retries: Maximum retry attempts on failure.
+            next_task_id_on_success: Next task ID on success.
+            next_task_id_on_failure: Next task ID on failure.
+            condition: Conditional branching expression.
+            parallel: Parallel execution hint.
+            depends_on: List of task IDs this task depends on.
+            timeout: Optional execution timeout in seconds (enforced by engine).
+            **kwargs: Additional arguments (like 'description', 'output_key') passed to the base Task constructor.
+        """
         if handler is None and handler_name is None:
-            raise ValueError("Either handler or handler_name must be provided")
-            
-        if input_data is None:
-            input_data = {}
-            
+            raise ValueError(f"DirectHandlerTask '{task_id}' requires either 'handler' callable or 'handler_name' string.")
+
+        # Ensure depends_on from kwargs is passed correctly to Task constructor
+        if depends_on is not None:
+             kwargs['depends_on'] = depends_on
+
         super().__init__(
             task_id=task_id,
             name=name,
-            is_llm_task=False,
-            tool_name="N/A",  # Not using tool registry for direct handlers
-            input_data=input_data,
+            is_llm_task=False, # Handlers are not LLM tasks by default
+            tool_name=None,    # Direct handlers don't use tools directly
+            input_data=input_data, # Pass input_data through
             max_retries=max_retries,
             next_task_id_on_success=next_task_id_on_success,
             next_task_id_on_failure=next_task_id_on_failure,
             condition=condition,
             parallel=parallel,
+            # Pass all other keyword args (description, output_key, depends_on etc.)
             **kwargs
         )
-        
-        # Store task-specific properties that aren't part of Task.__init__
-        self.handler = handler
-        self.handler_name = handler_name
-        self.depends_on = depends_on or []
-        self.timeout = timeout
-        
-        # Set task_type after init for serialization
-        self.task_type = "direct_handler"
-        
-        # Flag to indicate this is a direct handler task
-        self.is_direct_handler = True
-        
-        # If handler is provided directly, use its name as handler_name for to_dict()
-        if handler is not None and handler_name is None:
-            self.handler_name = handler.__name__
 
-    def execute(self, processed_input: Dict[str, Any] = None) -> Dict[str, Any]:
+        # Store DirectHandlerTask specific attributes
+        self.handler: Optional[Callable] = handler
+        self.handler_name: Optional[str] = handler_name
+        # `depends_on` is now also stored in the base class via kwargs
+        self.timeout: Optional[int] = timeout # Specific timeout for this task type
+
+        # --- Set identifier ---
+        self.task_type: str = "direct_handler"
+        # Add flag for convenience?
+        # self.is_direct_handler = True
+
+        # --- Infer handler_name if missing and handler is provided ---
+        if self.handler is not None and self.handler_name is None:
+            try:
+                self.handler_name = self.handler.__name__
+            except AttributeError:
+                self.handler_name = f"callable_{id(self.handler)}" # Fallback for lambdas/non-functions
+
+
+    def execute(self, processed_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Execute the direct handler task.
-        
+        Executes the assigned handler function IF it was provided directly.
+
+        NOTE: This method is primarily for cases where the `handler` callable
+        was passed during initialization. The WorkflowEngine is typically
+        responsible for looking up handlers by `handler_name` from the registry
+        and then calling the appropriate execution function (which might involve
+        this `execute` method or other logic).
+
         Args:
-            processed_input: Optional dictionary of processed input parameters.
-                             If None or empty, the task's own input_data will be used.
-            
+            processed_input: The resolved input data provided by the engine.
+                             If None, uses the task's static `input_data`.
+
         Returns:
-            Dictionary containing the result of the execution
+            A dictionary representing the standardized task output (TaskOutput).
         """
-        # Determine the input to use:
-        # Prioritize processed_input if provided by the engine.
-        # Fallback to the task's own input_data if processed_input is None or empty.
-        if processed_input:
-            input_to_use = processed_input
-        else:
-            input_to_use = self.input_data if self.input_data is not None else {}
-            
-        try:
-            if callable(self.handler):
-                # Import inspect only when needed
-                import inspect
-                
-                # Get handler signature
-                handler_sig = inspect.signature(self.handler)
-                param_count = len(handler_sig.parameters)
-                
-                # Call handler based on signature
-                if param_count == 1:
-                    # Single parameter handler - just pass input data
-                    result = self.handler(input_to_use)
-                elif param_count == 2:
-                    # Two parameter handler - pass task and input data
-                    result = self.handler(self, input_to_use)
-                else:
-                    # Invalid parameter count
-                    return {
-                        "success": False,
-                        "error": f"Handler has unexpected signature with {param_count} parameters. Expected 1 or 2 parameters.",
-                        "status": "failed"
-                    }
-                
-                # Update task status
-                self.set_status("completed")
-                
-                # Ensure result is properly formatted as a dictionary
-                if not isinstance(result, dict):
-                    error_result = {
-                        "success": False,
-                        "error": f"Handler returned non-dict value: {result}",
-                        "result": result,
-                        "response": result,
-                        "status": "failed"
-                    }
-                    self.set_status("failed")
-                    return error_result
-                    
-                # If the result doesn't have a success field, assume success if no error
-                if "success" not in result:
-                    result["success"] = "error" not in result
-                
-                # Set status based on success
-                if result.get("success", True):
-                    self.set_status("completed")
-                else:
-                    self.set_status("failed")
-                    
-                # Ensure both result and response fields exist for compatibility
-                if "result" in result and "response" not in result:
-                    result["response"] = result["result"]
-                elif "response" in result and "result" not in result:
-                    result["result"] = result["response"]
-                    
-                return result
-            
-            # If this task has a handler_name but no direct handler, log an error
-            elif self.handler_name:
-                handler_str = self.handler_name
-                error_result = {
-                    "success": False,
-                    "error": f"No callable handler available for name: {handler_str}, use registry instead",
-                    "status": "failed"
-                }
-                self.set_status("failed")
-                return error_result
-            
+        if not callable(self.handler):
+            # This indicates an issue: execute() called but no direct handler.
+            # The engine should have used the registry based on handler_name.
+            error_msg = f"Task '{self.id}': execute() called but no direct callable handler assigned."
+            if self.handler_name:
+                error_msg += f" Engine should resolve handler '{self.handler_name}' first."
             else:
-                # No handler available
-                error_result = {
-                    "success": False,
-                    "error": "No handler function or name specified for DirectHandlerTask",
-                    "status": "failed"
-                }
-                self.set_status("failed")
-                return error_result
-                
+                error_msg += " No handler or handler_name was properly configured."
+            print(f"ERROR - {error_msg}")
+            self.set_output({"success": False, "error": error_msg, "status": "failed"})
+            return self.output_data
+
+        input_to_use = processed_input if processed_input is not None else self.input_data
+
+        print(f"Executing direct handler for task '{self.id}' ({self.handler_name or 'anonymous'})...")
+        try:
+            # Use inspect to call handler correctly (1 or 2 args)
+            import inspect # Import locally
+            handler_sig = inspect.signature(self.handler)
+            param_count = len(handler_sig.parameters)
+
+            if param_count == 1:
+                # Assumes handler(input_data: dict) -> dict
+                result = self.handler(input_to_use)
+            elif param_count == 2:
+                # Assumes handler(task: Task, input_data: dict) -> dict
+                result = self.handler(self, input_to_use)
+            else:
+                raise TypeError(f"Handler '{self.handler_name or 'anonymous'}' for task '{self.id}' has an invalid signature: {param_count} parameters detected. Expected 1 (input_data) or 2 (task, input_data).")
+
+            # Standardize and store the output
+            self.set_output(result)
+            print(f"Direct handler for task '{self.id}' finished with status: {self.status}")
+
         except Exception as e:
-            import traceback
-            error_result = {
+            import traceback # Import locally
+            error_msg = f"Exception during direct handler execution for task '{self.id}': {str(e)}"
+            print(f"ERROR - {error_msg}\n{traceback.format_exc()}")
+            # Set output with error details including traceback
+            self.set_output({
                 "success": False,
-                "error": f"Handler execution failed: {str(e)}",
+                "error": error_msg,
                 "error_type": type(e).__name__,
-                "traceback": traceback.format_exc(),
+                "error_details": {"traceback": traceback.format_exc()},
                 "status": "failed"
-            }
-            self.set_status("failed")
-            return error_result
+            })
+
+        return self.output_data # Return the standardized output stored in the task
+
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert the task to a dictionary representation.
+        """Serializes the DirectHandlerTask to a dictionary."""
+        # Start with the base class dictionary which now includes optional fields
+        task_dict = super().to_dict()
+        # Add/override specific fields for DirectHandlerTask
+        task_dict['task_type'] = self.task_type
+        # handler callable itself cannot be serialized, rely on handler_name
+        task_dict['handler_name'] = self.handler_name
+        # Include timeout if it exists and wasn't None
+        if self.timeout is not None and 'timeout' not in task_dict:
+             task_dict['timeout'] = self.timeout
+        # depends_on should be included by base class now
 
-        Returns:
-            Dict representation of the task, including direct handler specific fields
-        """
-        base_dict = super().to_dict()
-        base_dict["is_direct_handler"] = True
-        base_dict["handler_name"] = self.handler_name
-        return base_dict
-
-    def set_tool_registry(self, tool_registry):
-        """
-        Set the tool registry for the task.
-        
-        Args:
-            tool_registry: Tool registry to use for tool executions
-        """
-        self.tool_registry = tool_registry
+        # Filter out None values again if desired
+        return {k: v for k, v in task_dict.items() if v is not None and v != []}
 
 
+# --- Custom Task Base Class ---
 class CustomTask(Task):
-    """Base class for implementing custom task types with specialized execution logic.
-    
-    Custom tasks can define their own execution logic while leveraging the workflow
-    system's variable resolution, input processing, and conditional branching.
+    """
+    Base class for creating new, specialized task types.
+
+    Subclasses should define a unique `task_type` identifier and potentially
+    override the `execute` method or provide specific logic for the engine
+    to use based on the `task_type`.
     """  # noqa: D202
-    
+
     def __init__(
         self,
         task_id: str,
         name: str,
-        task_type: str,
-        input_data: Dict[str, Any] = None,
+        task_type: str, # REQUIRED: Unique identifier for this custom task type
+        input_data: Optional[Dict[str, Any]] = None,
         max_retries: int = 0,
         next_task_id_on_success: Optional[str] = None,
         next_task_id_on_failure: Optional[str] = None,
         condition: Optional[str] = None,
         parallel: bool = False,
-        is_llm_task: bool = False,  # Allow specifying if this is an LLM task
-        **kwargs
+        is_llm_task: bool = False, # Allow custom tasks to be LLM tasks
+        **kwargs # Capture description, output_key, depends_on, and custom params
     ):
-        """Initialize a custom task.
-        
-        Args:
-            task_id: Unique identifier for the task
-            name: Display name for the task
-            task_type: The type identifier for this custom task
-            input_data: Dictionary of input parameters for the task
-            max_retries: Number of times to retry the task if it fails
-            next_task_id_on_success: Task ID to execute if this task succeeds
-            next_task_id_on_failure: Task ID to execute if this task fails
-            condition: Optional condition to evaluate to determine next task
-            parallel: Whether this task can be executed in parallel with others
-            is_llm_task: Whether this task is an LLM task (default: False)
-            **kwargs: Additional task-specific parameters
         """
+        Initializes a CustomTask instance.
+
+        Args:
+            task_id: Unique task identifier.
+            name: Human-readable task name.
+            task_type: String identifier for this custom task's type (e.g., "send_email", "database_query").
+            input_data: Input data dictionary or template.
+            max_retries: Maximum retry attempts.
+            next_task_id_on_success: Next task on success.
+            next_task_id_on_failure: Next task on failure.
+            condition: Conditional branching expression.
+            parallel: Parallel execution hint.
+            is_llm_task: Flag if this custom task involves LLM calls.
+            **kwargs: Additional arguments passed to Task base class (description, output_key, depends_on) and stored as attributes on the CustomTask instance for specific logic.
+        """
+        if not task_type:
+            raise ValueError(f"CustomTask '{task_id}' requires a non-empty 'task_type' identifier.")
+
         super().__init__(
             task_id=task_id,
             name=name,
-            is_llm_task=is_llm_task,  # Pass the is_llm_task parameter instead of hardcoding
-            tool_name=None,     # Custom tasks don't use the tool registry directly
-            input_data=input_data,
+            is_llm_task=is_llm_task,
+            tool_name=None, # Custom tasks don't use tool_name directly
+            input_data=input_data, # Pass through input_data
             max_retries=max_retries,
             next_task_id_on_success=next_task_id_on_success,
             next_task_id_on_failure=next_task_id_on_failure,
             condition=condition,
             parallel=parallel,
+            # Pass standard optional args and any others up to Task
             **kwargs
         )
-        self.task_type = task_type
-        
-        # Store any additional parameters as task attributes
+
+        # Store the specific type identifier
+        self.task_type: str = task_type
+
+        # Store any *additional* keyword arguments from kwargs that were NOT
+        # handled by the base Task.__init__ directly as attributes on this instance.
+        # This allows custom task definitions like CustomTask(..., custom_param='value')
+        base_task_params = {
+            'task_id', 'name', 'is_llm_task', 'tool_name', 'input_data',
+            'max_retries', 'next_task_id_on_success', 'next_task_id_on_failure',
+            'condition', 'parallel', 'use_file_search', 'file_search_vector_store_ids',
+            'file_search_max_results', 'validate_input', 'validate_output',
+            'description', 'output_key', 'depends_on' # Include those stored by Task from kwargs
+        }
         for key, value in kwargs.items():
-            setattr(self, key, value)
+            if key not in base_task_params:
+                if hasattr(self, key):
+                     print(f"Warning: CustomTask kwarg '{key}' for task '{self.id}' conflicts with an existing Task attribute. Consider renaming.")
+                else:
+                     setattr(self, key, value)
+
+
+    # Custom tasks NEED to define how they execute.
+    # This could be an overridden execute method, or the engine could look
+    # for a handler based on self.task_type. An explicit override is clearer.
+    def execute(self, processed_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Placeholder execute method. Subclasses MUST override this.
+
+        The engine will call this method to run the custom task's logic.
+        It should perform its action and return a dictionary conforming
+        to TaskOutput.
+        """
+        error_msg = f"Execute method not implemented for CustomTask type '{self.task_type}' (task_id='{self.id}')."
+        print(f"ERROR - {error_msg}")
+        self.set_output({"success": False, "error": error_msg, "status": "failed"})
+        return self.output_data # Return standardized error output
+
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializes the CustomTask to a dictionary."""
+        task_dict = super().to_dict()
+        # Ensure task_type is present
+        task_dict['task_type'] = self.task_type
+
+        # Add custom attributes stored from kwargs during init
+        base_task_params = set(Task.__init__.__code__.co_varnames[1:Task.__init__.__code__.co_argcount]) | {'description', 'output_key', 'depends_on'} # Get base params programmatically + optional ones
+        # Add known attributes from Task that might not be in __init__ args
+        known_task_attrs = base_task_params | {'status', 'output_data', 'output_annotations', 'retry_count', 'error', 'error_details', 'tool_registry', 'task_type'}
+
+        for key, value in self.__dict__.items():
+            # Include attributes that are not standard Task attributes (or already included)
+            # and are not internal/private
+            if not key.startswith('_') and key not in known_task_attrs and key not in task_dict:
+                 # Basic serialization check - skip callables for now
+                 if not callable(value):
+                     task_dict[key] = value
+                 else:
+                      print(f"Warning: Skipping callable attribute '{key}' during CustomTask serialization for task '{self.id}'.")
+
+        return task_dict

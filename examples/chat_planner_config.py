@@ -209,31 +209,41 @@ Your summary should be clear, concise, and directly address the user's original 
 class ChatPlannerConfig:
     """Helper class for accessing Chat Planner workflow configuration."""  # noqa: D202
     
+    @classmethod
+    def should_use_llm_validation(cls) -> bool:
+        # Usa el método estático 'get' de esta misma clase
+        return cls.get("validation.use_llm_validation", default=False)
+
+    @classmethod
+    def should_fix_with_llm(cls) -> bool:
+        # Usa el método estático 'get' de esta misma clase
+        return cls.get("validation.fix_with_llm", default=False)
+
+    # Ya tienes un get_validation_strictness estático, pero si quieres
+    # mantener el @classmethod, también debe usar cls.get
+    @classmethod
+    def get_validation_strictness(cls) -> str:
+         # Usa el método estático 'get' de esta misma clase
+        return cls.get("validation.strictness", default="strict")
+    
     @staticmethod
     def get(key: str, default: Any = None) -> Any:
         """
         Get a chat planner configuration value.
-        
-        Args:
-            key: The configuration key (without the 'chat_planner.' prefix)
-            default: Default value if the key doesn't exist
-            
-        Returns:
-            The configuration value
+        Prefixes key with 'chat_planner.'.
         """
         full_key = f"chat_planner.{key}"
+        # Llama a la función 'get' importada del módulo core.config
         return config_get(full_key, default)
     
     @staticmethod
     def set(key: str, value: Any) -> None:
         """
         Set a chat planner configuration value.
-        
-        Args:
-            key: The configuration key (without the 'chat_planner.' prefix)
-            value: The value to set
+        Prefixes key with 'chat_planner.'.
         """
         full_key = f"chat_planner.{key}"
+         # Llama a la función 'set' importada del módulo core.config
         config_set(full_key, value)
     
     @staticmethod

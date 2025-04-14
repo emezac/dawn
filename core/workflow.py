@@ -29,16 +29,18 @@ class Workflow:
         """
         self.id = workflow_id
         self.name = name
-        self.status = "pending"  # pending, running, completed, failed
+        self.status: str = "pending" # pending, running, completed, failed
         self.tasks = {}  # Map of task_id to Task objects
         self.task_order = []  # Ordered list of task_ids
         self.current_task_index = 0
         
         # Error tracking
-        self.error = None
-        self.error_code = None
+        self.error: Optional[str] = None
+        self.error_code: Optional[str] = None
+        self.failed_task_id: Optional[str] = None 
         self.error_details = {}
         self.failed_tasks = []
+        self.variables = {}  # Add variables dictionary to store workflow variables
 
     def add_task(self, task: Task) -> None:
         """
@@ -125,16 +127,15 @@ class Workflow:
                 if task.status == "failed"
             ]
 
-    def set_error(self, error_message: str, error_code: Optional[str] = None) -> None:
-        """
-        Set workflow error information.
-        
-        Args:
-            error_message: Error message describing the failure
-            error_code: Optional error code identifier
-        """
+    def set_error(self,
+                  error_message: str,
+                  error_code: Optional[str] = None,
+                  task_id: Optional[str] = None): # <-- Añadir parámetro task_id
         self.status = "failed"
         self.error = error_message
+        self.error_code = error_code
+        self.failed_task_id = task_id # <-- Guardar el ID de la tarea
+        print(f"Workflow '{self.id}' error set: {error_message} (Code: {error_code}, Task: {task_id})") # Añadir log si quieres
         
         # Store error code if provided
         if error_code is not None:
