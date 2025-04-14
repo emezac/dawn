@@ -1,8 +1,17 @@
 import re
 from typing import Any, Dict, List, Optional
+import logging
 
-import graphviz
-import networkx as nx
+logger = logging.getLogger(__name__)
+
+# Try to import graphviz but make it optional
+GRAPHVIZ_AVAILABLE = False
+try:
+    import graphviz
+    import networkx as nx
+    GRAPHVIZ_AVAILABLE = True
+except ImportError:
+    logger.warning("Graphviz module not installed. Visualization features will be disabled.")
 
 from core.task import Task
 from core.workflow import Workflow
@@ -41,6 +50,12 @@ def visualize_workflow(workflow: Workflow, filename: str = "workflow_graph", for
         format: The output format (e.g., 'pdf', 'png', 'svg').
         view: If True, automatically opens the generated file.
     """
+    if not GRAPHVIZ_AVAILABLE:
+        logger.warning("Cannot visualize workflow: graphviz module not installed.")
+        logger.info("To enable visualization, install graphviz with: pip install graphviz")
+        logger.info("And ensure the system Graphviz package is installed (https://graphviz.org/download/)")
+        return None
+        
     dot = graphviz.Digraph(comment=f"Workflow: {workflow.name}")
     dot.attr(rankdir="TB", label=f"Workflow: {workflow.name} (ID: {workflow.id})", fontsize="20")
 
@@ -85,7 +100,7 @@ def visualize_workflow(workflow: Workflow, filename: str = "workflow_graph", for
                             dot.edge(dep_task_id, task_id, **edge_styles["data"])
                             processed_edges.add(edge)
                     else:
-                        print(f"Warning: Task '{task_id}' references unknown task '{dep_task_id}' in input.")
+                        logger.warning(f"Task '{task_id}' references unknown task '{dep_task_id}' in input.")
 
         # 2. Control Flow Dependencies (Conditional Logic)
         if task.condition:
@@ -113,38 +128,15 @@ def visualize_workflow(workflow: Workflow, filename: str = "workflow_graph", for
                     dot.edge(task_id, task.next_task_id_on_failure, **edge_styles["failure"])
                     processed_edges.add(edge)
 
-        # 3. Implicit Sequential Dependency (Optional - can make graph cluttered)
-        # This adds an edge if task A is immediately before task B in task_order
-        # AND there isn't already an explicit edge (data or control flow) between them.
-        # try:
-        #     current_index = workflow.task_order.index(task_id)
-        #     if current_index + 1 < len(workflow.task_order):
-        #         next_task_id_in_order = workflow.task_order[current_index + 1]
-        #         # Check if an edge already exists due to data or control flow
-        #         explicit_edge_exists = False
-        #         if (task_id, next_task_id_in_order) in processed_edges:
-        #             explicit_edge_exists = True
-        #         else:
-        #             # Check reverse for data deps if next task uses current task's output
-        #             next_task_obj = workflow.tasks.get(next_task_id_in_order)
-        #             if next_task_obj and next_task_obj.input_data:
-        #                  for val in next_task_obj.input_data.values():
-        #                       if task_id in _extract_dependencies_from_value(val, next_task_id_in_order):
-        #                            explicit_edge_exists = True
-        #                            break
-        #
-        #         if not explicit_edge_exists:
-        #              dot.edge(task_id, next_task_id_in_order, style="dotted", color="gray", label=" sequence")
-        #              processed_edges.add((task_id, next_task_id_in_order)) # Mark sequence edge
-        # except ValueError:
-        #     pass # Task not found in order, should not happen
-
     # Render the graph
     try:
         output_path = dot.render(filename=filename, format=format, cleanup=True, view=view)
-        print(f"Workflow graph generated: {output_path}")
+        logger.info(f"Workflow graph generated: {output_path}")
+        return output_path
     except graphviz.backend.execute.ExecutableNotFound:
-        print("\nError: Graphviz executable not found.")
-        print("Please install Graphviz (https://graphviz.org/download/) and ensure it's in your system's PATH.")
+        logger.error("Graphviz executable not found.")
+        logger.info("Please install Graphviz (https://graphviz.org/download/) and ensure it's in your system's PATH.")
+        return None
     except Exception as e:
-        print(f"\nError generating graph: {e}")
+        logger.error(f"Error generating graph: {e}")
+        return None

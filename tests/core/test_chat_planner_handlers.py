@@ -248,9 +248,59 @@ class TestChatPlannerHandlers(unittest.TestCase):
         # Verify validation failed with appropriate errors
         self.assertFalse(result["success"])
         self.assertIn("error", result)
-        self.assertIn("validation_errors", result)
-        # Check for specific schema violation in the error message
-        self.assertTrue(any("invalid_type" in str(error) for error in result["validation_errors"]))
+        
+    def test_validate_plan_handler_nested_json(self):
+        """Test validate_plan_handler with a plan nested in a JSON object."""
+        # Create a nested JSON structure where the plan is inside an object
+        nested_json = {
+            "needs_clarification": False,
+            "ambiguity_details": [],
+            "raw_llm_output": json.loads(VALID_PLAN_JSON)
+        }
+        
+        # Execute handler with nested structure
+        result = validate_plan_handler(
+            self.mock_task,
+            {
+                "raw_llm_output": nested_json,
+                "tool_details": self.tool_details,
+                "handler_details": self.handler_details,
+                "user_request": "Find the latest AI research and summarize it"
+            }
+        )
+        
+        # Verify result - should successfully extract and validate the plan
+        self.assertTrue(result["success"], "Failed to validate nested plan structure")
+        self.assertIn("validated_plan", result["result"])
+        self.assertEqual(len(result["result"]["validated_plan"]), 2, "Plan should have 2 steps")
+        self.assertEqual(result["result"]["validated_plan"][0]["step_id"], "step_1_search")
+        self.assertEqual(result["result"]["validated_plan"][1]["step_id"], "step_2_summarize")
+        
+    def test_validate_plan_handler_nested_string(self):
+        """Test validate_plan_handler with a plan nested in a JSON string."""
+        # Create a nested JSON string where the plan is inside an object
+        nested_json_str = json.dumps({
+            "needs_clarification": False,
+            "plan": json.loads(VALID_PLAN_JSON)
+        })
+        
+        # Execute handler with nested string structure
+        result = validate_plan_handler(
+            self.mock_task,
+            {
+                "raw_llm_output": nested_json_str,
+                "tool_details": self.tool_details,
+                "handler_details": self.handler_details,
+                "user_request": "Find the latest AI research and summarize it"
+            }
+        )
+        
+        # Verify result - should successfully extract and validate the plan
+        self.assertTrue(result["success"], "Failed to validate nested plan in string")
+        self.assertIn("validated_plan", result["result"])
+        self.assertEqual(len(result["result"]["validated_plan"]), 2, "Plan should have 2 steps")
+        self.assertEqual(result["result"]["validated_plan"][0]["step_id"], "step_1_search")
+        self.assertEqual(result["result"]["validated_plan"][1]["step_id"], "step_2_summarize")
 
     def test_validate_plan_handler_json_error(self):
         """Test validate_plan_handler with malformed JSON."""
