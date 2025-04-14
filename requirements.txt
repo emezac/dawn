@@ -1,3 +1,5 @@
 openai>=1.6.0
 python-dotenv
 pytest 
+# Optional dependencies - comment out if not needed
+# graphviz  # Required for workflow visualization 

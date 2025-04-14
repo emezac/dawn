@@ -110,4 +110,28 @@ Contributions are welcome! Please read the [contributing guidelines](CONTRIBUTIN
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details. 
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+# Documentation
+
+This directory contains documentation for the AI Agent Framework.
+
+## Contents
+
+- [Architecture](architecture.md) - Overview of the framework's architecture
+- [API Reference](api_reference.md) - Detailed API documentation
+- [Error Propagation](error_propagation.md) - How to handle errors between tasks
+- [Vector Store ID Validation](vector_store_id_validation.md) - Utilities for validating Vector Store IDs
+
+## Development Resources
+
+- [Contributing](contributing.md) - Guidelines for contributing to the project
+- [Testing](testing.md) - How to run and write tests
+- [Code Style](code_style.md) - Coding standards and style guide
+
+## Troubleshooting
+
+For common issues and their solutions, check the `/fixes` directory at the root of the project. This contains markdown files documenting issues that have been encountered and fixed, including:
+
+- [Graphviz Dependency Fix](../fixes/graphviz_dependency_fix.md) - How to handle optional graphviz dependency
+- [Nested JSON in Plan Validation Fix](../fixes/nested_json_in_plan_validation_fix.md) - Fix for nested JSON structures in plan validation 

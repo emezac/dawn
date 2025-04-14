@@ -1,6 +1,62 @@
-# Dawn Framework Fixes and Compatibility Solutions
+# Framework Fixes and Solutions
 
-This directory contains documentation of common issues encountered during development and their solutions. These documents serve as a reference for developers working with the Dawn framework.
+This directory contains documentation for fixes and solutions to recurring issues in the Dawn AI Agent Framework. Each file documents a specific problem that was encountered, its root cause, the solution implemented, and how to avoid or address it in the future.
+
+## Purpose
+
+The purpose of this directory is to:
+
+1. Document solutions to non-trivial issues for future reference
+2. Provide guidance for developers encountering similar problems
+3. Prevent the same issues from being repeatedly fixed
+4. Serve as a knowledge base for the framework's maintenance
+
+## Format
+
+Each fix documentation follows a standard format:
+
+```
+# Issue Name
+
+## Issue
+Description of the problem and its symptoms
+
+## Root Cause
+Analysis of what caused the issue
+
+## Solution
+Detailed explanation of how the issue was fixed
+
+## Implementation Details
+Code examples showing before and after changes
+
+## Testing
+How the fix was tested and verified
+
+## Additional Notes
+Any other relevant information
+```
+
+## Current Fixes
+
+- [Graphviz Dependency Fix](graphviz_dependency_fix.md) - Documents how to handle optional graphviz dependency, making the visualization features gracefully degrade when the dependency is missing.
+- [Nested JSON in Plan Validation Fix](nested_json_in_plan_validation_fix.md) - Fix for handling nested JSON structures in plan validation that caused schema validation errors.
+
+## Contributing
+
+When fixing significant issues in the framework:
+
+1. Document the issue and solution in a new markdown file in this directory
+2. Follow the standard format described above
+3. Include code samples, error messages, and other relevant details
+4. Reference the fix in relevant code comments
+5. Add the new fix to this README
+
+## Usage Guidelines
+
+- Reference these fixes in code comments when implementing similar functionality
+- Check this directory when encountering issues to see if a solution already exists
+- Use these documents for training new team members on the framework's design and common pitfalls
 
 ## Available Fix Documentation
 

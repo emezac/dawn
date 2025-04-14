@@ -22,6 +22,34 @@ The AI Agent Framework is designed to enhance the capabilities of AI agents, all
   - Proper dependency injection support throughout the framework
   - Simplified management of service lifecycle and configuration
 
+## Installation and Dependencies
+
+### Core Dependencies
+
+Install the core dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
+For development, including testing and code quality tools:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+### Optional Dependencies
+
+The framework uses some optional dependencies for enhanced features:
+
+- **Graphviz** (optional): Used for workflow visualization. The framework will still work without it, but visualization features will be disabled.
+
+  To enable workflow visualization:
+  1. Install the Python package: `pip install graphviz`
+  2. Install the system Graphviz executable from [https://graphviz.org/download/](https://graphviz.org/download/)
+
+  The framework gracefully handles missing Graphviz dependency, allowing tests and core functionality to work without it.
+
 ## Usage
 
 ### Conditional Workflows
@@ -65,7 +93,7 @@ result = registry.execute_tool("web_search", input_data)
 
 ### Visualization of Workflow Execution
 
-The framework supports generating visual representations of workflows using Graphviz, which helps in understanding and debugging complex workflows.
+The framework supports generating visual representations of workflows using Graphviz, which helps in understanding and debugging complex workflows. This feature requires the optional Graphviz dependency (see [Installation and Dependencies](#installation-and-dependencies)).
 
 #### Usage Example
 
@@ -75,6 +103,8 @@ from core.utils.visualizer import visualize_workflow
 # Assuming 'workflow' is an instance of the Workflow class
 visualize_workflow(workflow, filename="workflow_graph", format='pdf', view=True)
 ```
+
+The visualization function gracefully handles cases where Graphviz is not installed, logging warnings instead of raising errors. For more details on the implementation, see the [Graphviz Dependency Fix](fixes/graphviz_dependency_fix.md) documentation.
 
 ### Vector Store ID Validation
 
