@@ -1,0 +1,157 @@
+2025-04-15 01:08:42,079 - core.tools.framework_tools - INFO - Registered 'get_available_capabilities' tool.
+2025-04-15 01:08:42,091 - dawn.config - INFO - Found environment-specific config at config/development.json
+2025-04-15 01:08:42,092 - dawn.config - DEBUG - Logging configured with level: DEBUG
+2025-04-15 01:08:42,092 - dawn.config - INFO - Configuration initialized for environment: development
+2025-04-15 01:08:42,092 - economic_impact_researcher - INFO - Successfully imported chat_planner_workflow components.
+2025-04-15 01:08:42,092 - core.services - DEBUG - Global ServicesContainer reset.
+2025-04-15 01:08:42,092 - core.services - DEBUG - ServicesContainer initialized.
+2025-04-15 01:08:42,092 - core.services - DEBUG - Registered service: tool_registry
+2025-04-15 01:08:42,092 - core.handlers.registry - DEBUG - Initialized HandlerRegistry
+2025-04-15 01:08:42,092 - core.services - DEBUG - Registered service: handler_registry
+2025-04-15 01:08:42,092 - core.services - DEBUG - ServicesContainer initialized with default services.
+2025-04-15 01:08:42,092 - economic_impact_researcher - INFO - Services initialized successfully
+2025-04-15 01:08:42,124 - core.services - DEBUG - Registered service: default_llm
+2025-04-15 01:08:42,124 - economic_impact_researcher - INFO - Registered LLM interface with services
+2025-04-15 01:08:42,124 - core.utils.registration_manager - DEBUG - Tool 'get_available_capabilities' already registered.
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Retrieved HandlerRegistry singleton from ServicesContainer.
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'plan_user_request_handler'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'plan_user_request_handler'
+2025-04-15 01:08:42,125 - core.utils.registration_manager - INFO - Registered 'plan_user_request_handler' handler.
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'validate_plan_handler'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'validate_plan_handler'
+2025-04-15 01:08:42,125 - core.utils.registration_manager - INFO - Registered 'validate_plan_handler' handler.
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'plan_to_tasks_handler'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'plan_to_tasks_handler'
+2025-04-15 01:08:42,125 - core.utils.registration_manager - INFO - Registered 'plan_to_tasks_handler' handler.
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'execute_dynamic_tasks_handler'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'execute_dynamic_tasks_handler'
+2025-04-15 01:08:42,125 - core.utils.registration_manager - INFO - Registered 'execute_dynamic_tasks_handler' handler.
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'summarize_results_handler'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'summarize_results_handler'
+2025-04-15 01:08:42,125 - core.utils.registration_manager - INFO - Registered 'summarize_results_handler' handler.
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'process_clarification_handler'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'process_clarification_handler'
+2025-04-15 01:08:42,125 - core.utils.registration_manager - INFO - Registered 'process_clarification_handler' handler.
+2025-04-15 01:08:42,125 - core.utils.registration_manager - INFO - Registration summary: 1/1 tools and 6/6 handlers successfully registered.
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - All standard registrations ensured
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registering required handlers for Chat Planner
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered custom implementation of get_available_capabilities
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - ✅ get_available_capabilities tool exists in registry
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'plan_user_request'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'plan_user_request'
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered handler: plan_user_request (custom wrapper)
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'validate_plan'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'validate_plan'
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered handler: validate_plan (custom wrapper)
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'plan_to_tasks'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'plan_to_tasks'
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered handler: plan_to_tasks
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'execute_dynamic_tasks'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'execute_dynamic_tasks'
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered handler: execute_dynamic_tasks
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'summarize_results'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'summarize_results'
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered handler: summarize_results
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'process_clarification'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'process_clarification'
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered handler: process_clarification
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'await_input'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'await_input'
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered handler: await_input
+2025-04-15 01:08:42,125 - core.handlers.registry - DEBUG - Registered handler 'check_clarification_needed'
+2025-04-15 01:08:42,125 - core.handlers.registry_access - DEBUG - Successfully registered handler 'check_clarification_needed'
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered handler: check_clarification_needed
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Registered all required handlers for the Economic Impact Researcher
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Planner handlers registered successfully
+2025-04-15 01:08:42,125 - economic_impact_researcher - INFO - Initial task added to workflow
+2025-04-15 01:08:42,126 - graphviz.saving - DEBUG - write lines to 'workflow_visualization'
+2025-04-15 01:08:42,126 - graphviz.backend.execute - DEBUG - run [PosixPath('dot'), '-Kdot', '-Tpng', '-O', 'workflow_visualization']
+2025-04-15 01:08:42,240 - graphviz.rendering - DEBUG - delete 'workflow_visualization'
+2025-04-15 01:08:42,240 - core.utils.visualizer - INFO - Workflow graph generated: workflow_visualization.png
+2025-04-15 01:08:42,240 - economic_impact_researcher - INFO - Workflow visualization created
+2025-04-15 01:08:42,240 - economic_impact_researcher - INFO - Registered tools: ['web_search', 'file_read', 'file_upload', 'create_vector_store', 'upload_file_to_vector_store', 'save_to_ltm', 'list_vector_stores', 'delete_vector_store', 'write_markdown', 'vector_store_create', 'get_available_capabilities']
+2025-04-15 01:08:42,240 - economic_impact_researcher - INFO - Registered handlers: ['plan_user_request_handler', 'validate_plan_handler', 'plan_to_tasks_handler', 'execute_dynamic_tasks_handler', 'summarize_results_handler', 'process_clarification_handler', 'plan_user_request', 'validate_plan', 'plan_to_tasks', 'execute_dynamic_tasks', 'summarize_results', 'process_clarification', 'await_input', 'check_clarification_needed']
+2025-04-15 01:08:42,241 - economic_impact_researcher - INFO - Creating workflow engine
+2025-04-15 01:08:42,241 - economic_impact_researcher - INFO - Running workflow engine
+2025-04-15 01:08:42,241 - chat_planner_workflow - INFO - Executing planning handler for task: init_workflow
+2025-04-15 01:08:42,241 - chat_planner_workflow - WARNING - Ambiguity prompt template missing variable: '\n  "needs_clarification"'. Using default.
+2025-04-15 01:08:42,241 - chat_planner_workflow - INFO - Checking request for ambiguity using LLM...
+2025-04-15 01:08:42,245 - openai._base_client - DEBUG - Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'json_data': {'messages': [{'role': 'system', 'content': "You are an expert AI assistant for the Dawn workflow framework. Your task is to analyze the user's request and create a detailed execution plan."}, {'role': 'user', 'content': "Analyze for ambiguity: \nInvestiga a fondo el impacto económico global de las tarifas impuestas por la administración Trump.\nEnfócate en los siguientes aspectos:\n1.  Identifica los principales países afectados (positiva o negativamente).\n2.  Resume el impacto específico por país identificado (ej. cambios en PIB, exportaciones/importaciones, empleo en sectores clave).\n3.  Analiza las implicaciones geopolíticas generales de estas tarifas (ej. relaciones comerciales, alianzas, tensiones globales).\n\nHerramientas disponibles para usar:\n- Usa web_search o research_tool para buscar información en internet\n- Usa analyze_text para analizar los resultados de búsqueda\n- Usa write_markdown para escribir el informe final\n\nRequerimientos de Salida:\n-   Genera un informe final en formato Markdown usando la herramienta write_markdown.\n-   Incluye una tabla bien organizada que resuma el impacto por país (Columnas: País, Sector Afectado, Impacto Resumido).\n-   Proporciona una sección separada con el análisis geopolítico.\n-   Utiliza fuentes de información actuales y confiables (noticias recientes, reportes económicos).\n-   El informe debe guardarse en un archivo llamado 'informe_tarifas_trump.md'.\n\nTools:No hay herramientas disponibles.\nHandlers:No hay handlers disponibles."}], 'model': 'gpt-4o-mini', 'max_tokens': 1500, 'temperature': 0.7}}
+2025-04-15 01:08:42,266 - openai._base_client - DEBUG - Sending HTTP Request: POST https://api.openai.com/v1/chat/completions
+2025-04-15 01:08:42,266 - httpcore.connection - DEBUG - connect_tcp.started host='api.openai.com' port=443 local_address=None timeout=5.0 socket_options=None
+2025-04-15 01:08:42,335 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x108136320>
+2025-04-15 01:08:42,335 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x107ffe4c0> server_hostname='api.openai.com' timeout=5.0
+2025-04-15 01:08:42,372 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1081363b0>
+2025-04-15 01:08:42,373 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-04-15 01:08:42,373 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-04-15 01:08:42,373 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-04-15 01:08:42,373 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-04-15 01:08:42,373 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-04-15 01:08:47,290 - httpcore.http11 - DEBUG - receive_response_headers.failed exception=KeyboardInterrupt()
+2025-04-15 01:08:47,290 - httpcore.http11 - DEBUG - response_closed.started
+2025-04-15 01:08:47,290 - httpcore.http11 - DEBUG - response_closed.complete
+INFO: LLMInterface initialized with model 'gpt-4o-mini'.
+INFO: WorkflowEngine initialized for workflow 'Chat Planner Workflow' (ID: chat_planner_workflow)
+INFO: Using ToolRegistry instance 4430273536 with tools: ['web_search', 'file_read', 'file_upload', 'create_vector_store', 'upload_file_to_vector_store', 'save_to_ltm', 'list_vector_stores', 'delete_vector_store', 'write_markdown', 'vector_store_create', 'get_available_capabilities']
+
+>>> Workflow START: Chat Planner Workflow (ID: chat_planner_workflow)
+  [TASK START] >> 'Initialize Chat Planner Workflow' (ID: init_workflow)
+INFO: [PROCESS_INPUT:init_workflow] Original input: {'user_request': "\nInvestiga a fondo el impacto económico global de las tarifas impuestas por la administración Trump.\nEnfócate en los siguientes aspectos:\n1.  Identifica los principales países afectados (positiva o negativamente).\n2.  Resume el impacto específico por país identificado (ej. cambios en PIB, exportaciones/importaciones, empleo en sectores clave).\n3.  Analiza las implicaciones geopolíticas generales de estas tarifas (ej. relaciones comerciales, alianzas, tensiones globales).\n\nHerramientas disponibles para usar:\n- Usa web_search o research_tool para buscar información en internet\n- Usa analyze_text para analizar los resultados de búsqueda\n- Usa write_markdown para escribir el informe final\n\nRequerimientos de Salida:\n-   Genera un informe final en formato Markdown usando la herramienta write_markdown.\n-   Incluye una tabla bien organizada que resuma el impacto por país (Columnas: País, Sector Afectado, Impacto Resumido).\n-   Proporciona una sección separada con el análisis geopolítico.\n-   Utiliza fuentes de información actuales y confiables (noticias recientes, reportes económicos).\n-   El informe debe guardarse en un archivo llamado 'informe_tarifas_trump.md'.\n"}
+INFO: [PROCESS_INPUT:init_workflow] Final processed input: {'user_request': "\nInvestiga a fondo el impacto económico global de las tarifas impuestas por la administración Trump.\nEnfócate en los siguientes aspectos:\n1.  Identifica los principales países afectados (positiva o negativamente).\n2.  Resume el impacto específico por país identificado (ej. cambios en PIB, exportaciones/importaciones, empleo en sectores clave).\n3.  Analiza las implicaciones geopolíticas generales de estas tarifas (ej. relaciones comerciales, alianzas, tensiones globales).\n\nHerramientas disponibles para usar:\n- Usa web_search o research_tool para buscar información en internet\n- Usa analyze_text para analizar los resultados de búsqueda\n- Usa write_markdown para escribir el informe final\n\nRequerimientos de Salida:\n-   Genera un informe final en formato Markdown usando la herramienta write_markdown.\n-   Incluye una tabla bien organizada que resuma el impacto por país (Columnas: País, Sector Afectado, Impacto Resumido).\n-   Proporciona una sección separada con el análisis geopolítico.\n-   Utiliza fuentes de información actuales y confiables (noticias recientes, reportes económicos).\n-   El informe debe guardarse en un archivo llamado 'informe_tarifas_trump.md'.\n"}
+INFO: Engine: Executing registry lookup ('plan_user_request') for task 'init_workflow'
+INFO: Sending prompt to model 'gpt-4o-mini' (first 100 chars): Analyze for ambiguity: 
+Investiga a fondo el impacto económico global de las tarifas impuestas por l...
+Traceback (most recent call last):
+  File "/Users/admin/code/newstart/dawn/examples/economic_impact_researcher.py", line 632, in <module>
+    main()
+  File "/Users/admin/code/newstart/dawn/examples/economic_impact_researcher.py", line 609, in main
+    results = engine.run()
+  File "/Users/admin/code/newstart/dawn/core/engine.py", line 399, in run
+    output = handler(current_task, resolved_input)
+  File "/Users/admin/code/newstart/dawn/examples/economic_impact_researcher.py", line 256, in custom_plan_user_request_handler
+    result = plan_user_request_handler(task, input_data)
+  File "/Users/admin/code/newstart/dawn/examples/chat_planner_workflow.py", line 188, in plan_user_request_handler
+    ambiguity_response = llm_interface.execute_llm_call(
+  File "/Users/admin/code/newstart/dawn/core/llm/interface.py", line 112, in execute_llm_call
+    response = self.client.chat.completions.create(**request_params)
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/openai/_utils/_utils.py", line 279, in wrapper
+    return func(*args, **kwargs)
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 914, in create
+    return self._post(
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/openai/_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/openai/_base_client.py", line 919, in request
+    return self._request(
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/openai/_base_client.py", line 955, in _request
+    response = self._client.send(
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpcore/_sync/connection.py", line 103, in handle_request
+    return self._connection.handle_request(request)
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 136, in handle_request
+    raise exc
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 106, in handle_request
+    ) = self._receive_response_headers(**kwargs)
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 177, in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 217, in _receive_event
+    data = self._network_stream.read(
+  File "/Users/admin/code/newstart/dawn/venv/lib/python3.10/site-packages/httpcore/_backends/sync.py", line 128, in read
+    return self._sock.recv(max_bytes)
+  File "/usr/local/lib/python3.10/ssl.py", line 1292, in recv
+    return self.read(buflen)
+  File "/usr/local/lib/python3.10/ssl.py", line 1165, in read
+    return self._sslobj.read(len)
+KeyboardInterrupt

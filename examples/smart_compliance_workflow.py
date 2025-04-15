@@ -447,82 +447,85 @@ def build_compliance_check_workflow(
                  print("DEBUG parse_llm_json_output - Input dictionary did not contain 'response' or 'result' string.")
                  # Attempt to serialize the whole dict if it looks like the intended data
                  if "assessment_id" in llm_output_value: # Heuristic check
-                    try:
-                        json_string_to_parse = json.dumps(llm_output_value)
-                        print("DEBUG parse_llm_json_output - Serialized the input dict itself.")
-                    except TypeError:
-                         print("DEBUG parse_llm_json_output - Could not serialize input dict.")
-                         pass # Fall through to error/default handling
-                 
-        # If the input was already a string (e.g., direct input or failed resolution)
+                     json_string_to_parse = json.dumps(llm_output_value)
         elif isinstance(llm_output_value, str):
-            json_string_to_parse = llm_output_value
             print("DEBUG parse_llm_json_output - Input was already a string.")
+            json_string_to_parse = llm_output_value
         else:
-             print(f"DEBUG parse_llm_json_output - Unexpected input type: {type(llm_output_value)}")
-
-        # Now, try to parse the extracted string
+            print(f"DEBUG parse_llm_json_output - Unexpected input type: {type(llm_output_value)}")
+        
+        # Try to parse the JSON string
         if json_string_to_parse:
+            print(f"DEBUG parse_llm_json_output - Attempting to parse: {json_string_to_parse[:100]}...")
             try:
-                # Clean potential markdown code fences
-                cleaned_json_string = re.sub(r"^```json\s*|\s*```$", "", json_string_to_parse, flags=re.MULTILINE).strip()
-                print(f"DEBUG parse_llm_json_output - Attempting to parse: {cleaned_json_string[:200]}...")
-                result = json.loads(cleaned_json_string)
+                parsed_json = json.loads(json_string_to_parse)
                 return {
                     "success": True,
-                    "result": result,
-                    "error": None
+                    "result": parsed_json,
+                    "risk_level": parsed_json.get("risk_level", "Medium"),  # Default to Medium if not specified
+                    "findings_count": len(parsed_json.get("findings", [])),
                 }
             except json.JSONDecodeError as e:
                 print(f"DEBUG parse_llm_json_output - JSONDecodeError: {e}")
-                # Fallback to regex extraction if primary parsing fails
+                # Try a more lenient approach for malformed JSON from LLMs
                 try:
-                    # Look for JSON object within the string
-                    match = re.search(r'\{.*\}', cleaned_json_string, re.DOTALL)
+                    # Try to extract JSON using regex as a fallback
+                    print(f"DEBUG parse_llm_json_output - Trying regex fallback: {json_string_to_parse[:100]}...")
+                    match = re.search(r'\{[\s\S]*\}', json_string_to_parse)
                     if match:
                         potential_json = match.group(0)
-                        print(f"DEBUG parse_llm_json_output - Trying regex fallback: {potential_json[:200]}...")
-                        result = json.loads(potential_json)
+                        parsed_json = json.loads(potential_json)
                         return {
                             "success": True,
-                            "result": result,
-                            "error": None
+                            "result": parsed_json,
+                            "risk_level": parsed_json.get("risk_level", "Medium"),
+                            "findings_count": len(parsed_json.get("findings", [])),
                         }
-                except json.JSONDecodeError as e2:
-                     print(f"DEBUG parse_llm_json_output - Regex fallback failed: {e2}")
-                     pass # Fall through to default error structure
-
-        # If parsing failed or no valid string was found, return default structure
-        print(f"DEBUG parse_llm_json_output - Parsing failed or no valid JSON string found. Returning default structure.")
-        # Keep the previous default logic as a final fallback
+                except (json.JSONDecodeError, AttributeError) as fallback_error:
+                    print(f"DEBUG parse_llm_json_output - Regex fallback failed: {fallback_error}")
+                    # Continue to default return
+        
+        print("DEBUG parse_llm_json_output - Parsing failed or no valid JSON string found. Returning default structure.")
+        # Default structure if parsing fails
         return {
-            "success": True, # Treat parsing failure as success with default data for now
+            "success": True,  # Don't interrupt the workflow on parsing failure
             "result": {
-                "assessment_id": f"parse-error-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "assessment_id": f"fallback-{datetime.now().strftime('%Y%m%d%H%M%S')}",
                 "frameworks_checked": ["SOC2", "HIPAA", "GDPR"],
-                "risk_level": "Medium",
-                "findings": [{"framework": "System", "risk": "Low", "finding": "Could not parse previous step output", "recommendation": "Check LLM response format"}],
-                "summary": "Could not parse LLM output."
+                "risk_level": "Medium",  # Conservative default
+                "findings": [
+                    {
+                        "framework": "SYSTEM",
+                        "risk": "Medium",
+                        "finding": "Could not parse JSON output from LLM response.",
+                        "recommendation": "Review raw LLM output manually for compliance concerns."
+                    }
+                ],
+                "summary": "Analysis parsing failed, defaulting to Medium risk level."
             },
-            "error": "Failed to parse JSON from LLM output"
+            "risk_level": "Medium",
+            "findings_count": 1,
         }
 
-    task2_parse = DirectHandlerTask(
+    task2 = DirectHandlerTask(
         task_id="task_2_parse_json_output",
         name="Parse JSON Analysis Output",
         handler=parse_llm_json_output,
         input_data={
-            "llm_output": "${task_1_analyze_risk_llm.output_data}" # Engine resolves this now
+            "llm_output": "${task_1_analyze_risk_llm.output_data}",  # Try to get the whole output data
         },
         next_task_id_on_success="task_3_evaluate_report",
-        next_task_id_on_failure="task_7_log_info",  # Go to info log on failure for better error handling
+        next_task_id_on_failure="task_3_evaluate_report",  # Continue even if parsing fails
     )
-    workflow.add_task(task2_parse)
+    workflow.add_task(task2)
 
-    # Task 3: Evaluate Compliance Report (LLM)
-    task3_input_data = {
-        # IMPORTANT: Input reference now points to the 'result' field of the PARSED output from task2
-        "prompt": '''Analyze the following compliance analysis report JSON:
+    # Task 3: Evaluate the findings to determine the action needed
+    task3 = create_task(
+        task_id="task_3_evaluate_report",
+        name="Evaluate Compliance Findings",
+        is_llm_task=True,
+        input_data={
+            "prompt": """Analyze the following compliance analysis report JSON:
         
         ${task_2_parse_json_output.output_data.result} 
         
@@ -535,148 +538,184 @@ def build_compliance_check_workflow(
           "Summary": "[Your one-sentence summary]",
           "Action": "[ACTION_REQUIRED | REVIEW_RECOMMENDED | LOG_INFO]"
         }
-        ''' # End prompt
-    }
-
-    # Optionally add LTM file search to this evaluation task
-    task3_use_file_search = False
-    task3_file_search_vector_store_ids = []
-
-    if ltm_vs_id:
-        task3_use_file_search = True
-        task3_file_search_vector_store_ids.append(ltm_vs_id)
-
-    task3 = create_task(
-        task_id="task_3_evaluate_report",
-        name="Evaluate Compliance Findings",
-        is_llm_task=True,
-        input_data=task3_input_data,
-        dependencies=["task_2_parse_json_output"],
-        use_file_search=task3_use_file_search,
-        file_search_vector_store_ids=task3_file_search_vector_store_ids,
+        """
+        },
         next_task_id_on_success="task_4_parse_evaluation",
-        next_task_id_on_failure="task_7_log_info",  # Send to info log on failure
+        next_task_id_on_failure="task_7_log_info",  # Skip to logging if evaluation fails
     )
     workflow.add_task(task3)
 
-    # NEW Task: Parse Evaluation Output
-    task4_parse = DirectHandlerTask(
+    # Task 4: Parse evaluation output with improved error handling
+    def parse_evaluation_output(task, input_data):
+        """Parse the evaluation JSON output with better error handling"""
+        llm_output = input_data.get("llm_output")
+        
+        print(f"DEBUG parse_evaluation_output - Received value type: {type(llm_output)}")
+        print(f"DEBUG parse_evaluation_output - Received value preview: {str(llm_output)[:100]}...")
+        
+        # If we got a raw string or dict, process it
+        json_string = None
+        
+        # Handle different input types
+        if isinstance(llm_output, dict):
+            # Try to extract the string from standard keys
+            if "response" in llm_output:
+                json_string = llm_output["response"]
+            elif "result" in llm_output:
+                json_string = llm_output["result"]
+            # Fall back to the entire dict for direct serialization
+            else:
+                try:
+                    json_string = json.dumps(llm_output)
+                except:
+                    pass
+        elif isinstance(llm_output, str):
+            json_string = llm_output
+            
+        # Default values
+        default_result = {
+            "Summary": "No major concerns identified",
+            "Action": "LOG_INFO"
+        }
+        
+        # Try to parse the JSON
+        if json_string:
+            # Clean markdown code blocks if present
+            cleaned = re.sub(r'```(?:json)?\s*|\s*```', '', json_string).strip()
+            try:
+                parsed = json.loads(cleaned)
+                return {
+                    "success": True,
+                    "result": parsed,
+                    "action": parsed.get("Action", "LOG_INFO"),
+                    "summary": parsed.get("Summary", "No summary provided")
+                }
+            except json.JSONDecodeError:
+                # Try regex as a fallback
+                match = re.search(r'\{\s*"Summary"\s*:.*"Action"\s*:.*\}', cleaned, re.DOTALL)
+                if match:
+                    try:
+                        potential_json = match.group(0)
+                        parsed = json.loads(potential_json)
+                        return {
+                            "success": True,
+                            "result": parsed,
+                            "action": parsed.get("Action", "LOG_INFO"),
+                            "summary": parsed.get("Summary", "No summary provided")
+                        }
+                    except:
+                        pass
+                        
+        # Return default if all parsing attempts failed
+        return {
+            "success": True,  # Don't break the workflow
+            "result": default_result,
+            "action": "LOG_INFO",  # Conservative default
+            "summary": "No major concerns identified"
+        }
+                
+    task4 = DirectHandlerTask(
         task_id="task_4_parse_evaluation",
         name="Parse Evaluation Output",
-        handler=parse_llm_json_output,
+        handler=parse_evaluation_output,
         input_data={
-            "llm_output": "${task_3_evaluate_report.output_data}"
+            "llm_output": "${task_3_evaluate_report.output_data}",
         },
         next_task_id_on_success="task_5_log_alert_check",
-        next_task_id_on_failure="task_7_log_info",  # Send to info log on failure
+        next_task_id_on_failure="task_7_log_info",  # Skip to info log on failure
     )
-    workflow.add_task(task4_parse)
+    workflow.add_task(task4)
 
-    # Task 5: Check if Alert is Required (Using DirectHandlerTask)
+    # Task 5: Check if an alert is needed based on evaluation
     def check_alert_needed(task, input_data):
-        """Check if an alert is needed based on evaluation"""
+        """Determine if a critical alert is needed based on evaluation"""
         print(f"DEBUG check_alert_needed - Input type: {type(input_data)}")
         print(f"DEBUG check_alert_needed - Input data: {str(input_data)[:100]}...")
         
-        evaluation = input_data.get("evaluation", {})
+        evaluation = input_data.get("evaluation")
         print(f"DEBUG check_alert_needed - Evaluation type: {type(evaluation)}")
         print(f"DEBUG check_alert_needed - Evaluation: {str(evaluation)[:100]}...")
         
-        # Handle different input formats
-        action = "LOG_INFO"  # Default action
+        alert_needed = False
+        action = "LOG_INFO"
         
-        # Handle string input (likely an unresolved variable)
+        # Handle direct string input (likely unresolved variable)
         if isinstance(evaluation, str):
-            print(f"DEBUG check_alert_needed - Evaluation is a string, likely unresolved variable: {evaluation[:50]}...")
-            # Default to LOG_INFO for unresolved variables
+            print(f"DEBUG check_alert_needed - Evaluation is a string, likely unresolved variable: {evaluation[:100]}...")
+            # In this case, we'll default to cautious behavior
             return {
                 "success": True,
                 "result": {
-                    "alert_needed": False,
-                    "action": "LOG_INFO"
-                },
-                "error": None
+                    "alert_needed": True,  # Default to true if evaluation data is missing/unresolved
+                    "action": "ACTION_REQUIRED",
+                    "reason": "Variable resolution failure - defaulting to alert for safety"
+                }
+            }
+            
+        # Handle dictionary input (normal case)
+        if isinstance(evaluation, dict):
+            # Check if we have a properly structured evaluation result
+            result = evaluation.get("result", {})
+            action = evaluation.get("action", "LOG_INFO")
+            
+            if isinstance(result, dict) and "Action" in result:
+                action = result.get("Action")
+                
+            # Determine if alert is needed
+            alert_needed = (action == "ACTION_REQUIRED")
+            
+            return {
+                "success": True,
+                "result": {
+                    "alert_needed": alert_needed,
+                    "action": action,
+                    "reason": f"Based on evaluation action: {action}"
+                }
             }
         
-        # Handle dictionary input
-        if isinstance(evaluation, dict):
-            # If we got a result field, extract it
-            if "result" in evaluation:
-                evaluation = evaluation.get("result", {})
-                
-            # If we don't have an Action field but have a response field that's a string,
-            # try to parse it as JSON
-            if "Action" not in evaluation and "response" in evaluation and isinstance(evaluation.get("response"), str):
-                try:
-                    response_json = json.loads(evaluation.get("response"))
-                    if isinstance(response_json, dict) and "Action" in response_json:
-                        evaluation = response_json
-                except json.JSONDecodeError:
-                    # If we can't parse as JSON, try to extract Action using regex
-                    response_str = evaluation.get("response", "")
-                    action_match = re.search(r'"Action"\s*:\s*"([^"]+)"', response_str)
-                    if action_match:
-                        action = action_match.group(1)
-                        evaluation = {"Action": action}
-        
-        # Extract the Action field with a safe default
-        action = evaluation.get("Action", action)
-        
-        # Determine if an alert is needed
-        alert_needed = action == "ACTION_REQUIRED"
-        
-        logger.info(f"Alert check result: action='{action}', alert_needed={alert_needed}")
-        
+        # Default cautious behavior for unexpected input
         return {
             "success": True,
             "result": {
-                "alert_needed": alert_needed,
-                "action": action
-            },
-            "error": None
+                "alert_needed": True,  # Default to true for any unexpected input
+                "action": "ACTION_REQUIRED",
+                "reason": "Invalid evaluation format - defaulting to alert for safety"
+            }
         }
-        
-    task5_check = DirectHandlerTask(
+
+    task5 = DirectHandlerTask(
         task_id="task_5_log_alert_check",
         name="Check If Alert Is Needed",
         handler=check_alert_needed,
         input_data={
-            "evaluation": "${task_4_parse_evaluation.output_data}"
+            "evaluation": "${task_4_parse_evaluation.output_data}",
         },
         next_task_id_on_success="task_6_log_alert",
-        next_task_id_on_failure="task_7_log_info",  # Always go to log_info on failure
+        condition="output_data.get('result', {}).get('alert_needed', False)",
+        next_task_id_on_failure="task_7_log_info"
     )
-    workflow.add_task(task5_check)
+    workflow.add_task(task5)
 
-    # Task 6: Log Critical Alert (Updated to use DirectHandlerTask)
+    # Task 6: Log critical compliance alert
     task6 = DirectHandlerTask(
         task_id="task_6_log_alert",
         name="Log Critical Compliance Alert",
         handler=log_alert_handler,
         input_data={
-            "message": f"Compliance check requires immediate action for item described starting with: "
-            f"'{item_description[:100]}...'. "
-            f"Assessment Summary: ${{task_4_parse_evaluation.output_data.result.Summary | 'Summary not available'}}. "
-            f"Error details: ${{error.task_1_analyze_risk_llm || error.task_3_evaluate_report || 'No errors detected'}}"
+            "message": "Compliance check requires immediate action for item described starting with: '${item_to_check.description[:100]}...'. Assessment Summary: ${task_4_parse_evaluation.output_data.result.Summary || 'Summary not available'}. Action required: ${task_4_parse_evaluation.output_data.result.Action || 'ACTION_REQUIRED'}"
         },
-        condition="output_data.get('result', {}).get('alert_needed', False)",
-        next_task_id_on_success=None,  # End path if alert is logged
-        next_task_id_on_failure="task_7_log_info",  # Go to info log if condition fails
+        next_task_id_on_success="task_7_log_info"
     )
     workflow.add_task(task6)
 
-    # Task 7: Log Info/Recommendation (Updated to use DirectHandlerTask)
+    # Task 7: Log general compliance information
     task7 = DirectHandlerTask(
         task_id="task_7_log_info",
         name="Log Compliance Review Recommendation",
         handler=log_info_handler,
         input_data={
-            "message": f"Compliance check completed for item starting with: '{item_description[:100]}...'. "
-            f"Status: ${{task_4_parse_evaluation.output_data.result.Action | task_5_log_alert_check.output_data.result.action | 'LOG_INFO'}}. "
-            f"Summary: ${{task_4_parse_evaluation.output_data.result.Summary | 'No summary available'}}. "
-            f"Errors detected: ${{error.task_1_analyze_risk_llm || error.task_2_parse_json_output || error.task_3_evaluate_report || error.task_4_parse_evaluation || error.task_5_log_alert_check || 'None'}}"
-        },
-        next_task_id_on_success=None,  # End path
+            "message": "Compliance check completed for item starting with: '${item_to_check.description[:100]}...'. Status: ${task_4_parse_evaluation.output_data.result.Action || task_5_log_alert_check.output_data.result.action || 'LOG_INFO'}. Summary: ${task_4_parse_evaluation.output_data.result.Summary || 'No summary available'}."
+        }
     )
     workflow.add_task(task7)
 
