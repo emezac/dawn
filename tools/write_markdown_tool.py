@@ -1,12 +1,13 @@
 import os
+from datetime import datetime
 
 
 class WriteMarkdownTool:
     """
     Tool for writing markdown content to files.
-    """
+    """  # noqa: D202
 
-    def write_markdown_file(self, file_path: str, content: str) -> str:
+    def write_markdown_file(self, file_path: str, content: str) -> dict:
         """
         Write content to a Markdown file at the specified file_path.
         If the parent directory doesn't exist, create it.
@@ -16,7 +17,11 @@ class WriteMarkdownTool:
             content (str): The Markdown content to write.
 
         Returns:
-            str: The absolute file path of the written file.
+            dict: A dictionary containing:
+                - success: bool indicating if the operation was successful
+                - result: str containing the absolute file path on success
+                - error: str containing error message on failure
+                - metadata: dict containing additional information
 
         Raises:
             ValueError: If file_path is empty or not a string.
@@ -39,5 +44,14 @@ class WriteMarkdownTool:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-        # Return absolute path for consistency
-        return os.path.abspath(file_path)
+        # Return formatted response
+        absolute_path = os.path.abspath(file_path)
+        return {
+            "success": True,
+            "result": absolute_path,
+            "error": None,
+            "metadata": {
+                "file_size": len(content),
+                "timestamp": datetime.now().isoformat()
+            }
+        }

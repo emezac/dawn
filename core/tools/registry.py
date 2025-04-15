@@ -335,28 +335,52 @@ class ToolRegistry:
             )
 
     def write_markdown_tool_handler(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handler for the Write Markdown File tool."""
-        try:
-            write_tool = WriteMarkdownTool()
-            
-            file_path = input_data.get("file_path", "")
-            if not file_path:
-                return create_error_response(
-                    message="Missing 'file_path' for writing markdown",
-                    error_code=ErrorCode.VALIDATION_MISSING_FIELD,
-                    details={"field_name": "file_path"}
-                )
+        """
+        Handler for the write_markdown tool.
+        
+        Args:
+            input_data (dict): Input data containing:
+                - file_path: str, path where the markdown file should be written
+                - content: str, markdown content to write
                 
-            content = input_data.get("content", "")
+        Returns:
+            dict: Response containing:
+                - success: bool indicating if the operation was successful
+                - result: dict containing the file path and metadata on success
+                - error: str containing error message on failure
+        """
+        try:
+            # Extract parameters
+            file_path = input_data.get("file_path")
+            content = input_data.get("content")
             
-            result_path = write_tool.write_markdown_file(file_path, content)
-            return format_tool_response(result_path)
+            if not file_path or not content:
+                return {
+                    "success": False,
+                    "result": None,
+                    "error": "Missing required parameters: file_path and content"
+                }
+            
+            # Create tool instance and execute
+            tool = WriteMarkdownTool()
+            response = tool.write_markdown_file(file_path, content)
+            
+            # Ensure response is properly formatted
+            if not isinstance(response, dict):
+                return {
+                    "success": False,
+                    "result": None,
+                    "error": "Invalid response format from write_markdown tool"
+                }
+                
+            return response
+            
         except Exception as e:
-            return create_error_response(
-                message=f"Writing markdown failed: {str(e)}",
-                error_code=ErrorCode.EXECUTION_TOOL_FAILED,
-                details={"error_type": type(e).__name__}
-            )
+            return {
+                "success": False,
+                "result": None,
+                "error": str(e)
+            }
 
     def upload_file_to_vector_store_tool_handler(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handler for the Upload File to Vector Store tool."""
