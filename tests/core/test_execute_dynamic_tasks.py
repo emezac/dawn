@@ -15,6 +15,16 @@ from unittest.mock import MagicMock, patch
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
+# Use mock ChatPlannerConfig to avoid PyYAML dependency
+sys.modules['examples.chat_planner_config'] = MagicMock()
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig = MagicMock()
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_planning_system_message.return_value = "You are a planning assistant."
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_tokens.return_value = 1500
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_llm_temperature.return_value = 0.7
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_prompt.return_value = "Create a plan for: {user_request}"
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_validation_strictness.return_value = "medium"
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.is_plan_validation_enabled.return_value = True
+
 # Import the handler to test
 from examples.chat_planner_workflow import execute_dynamic_tasks_handler
 

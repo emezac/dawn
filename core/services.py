@@ -268,12 +268,12 @@ class ServicesContainer:
         Returns:
             A WorkflowEngine instance with all dependencies injected
         """
-        from .workflow_engine import WorkflowEngine
+        from .engine import WorkflowEngine
         return WorkflowEngine(
             workflow=workflow,
             llm_interface=self.get_llm_interface(),
             tool_registry=self.tool_registry,
-            handler_registry=self.handler_registry
+            services=self
         )
 
 

@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional, Callable
 # Core imports
 from core.llm.interface import LLMInterface
 # Import specific task types needed for dispatching
-from core.task import Task, DirectHandlerTask, TaskOutput # Ensure TaskOutput is imported
+from core.task import Task, DirectHandlerTask, TaskOutput, validate_output_format # Ensure TaskOutput is imported
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
 # --- IMPORT ErrorCode CORRECTAMENTE ---
@@ -395,36 +395,59 @@ class WorkflowEngine:
                     else: raise ValueError(f"DirectHandlerTask '{current_task.id}' misconfigured.")
 
                     log_info(f"Engine: Executing {handler_source} for task '{current_task.id}'")
-                    # Assume handler signature is handler(task, input_data)
-                    output = handler(current_task, resolved_input)
+                    # Execute the handler and ensure it returns standardized output
+                    raw_output = handler(current_task, resolved_input)
+                    output = validate_output_format(raw_output)
+                    current_task.set_output(output)
+                    success = output.get("success", False)
 
-                elif getattr(current_task, 'is_llm_task', False):
-                    if not self.llm_interface: raise RuntimeError(f"LLMInterface needed for '{current_task.id}'.")
+                elif getattr(current_task, 'is_llm_task', False) and self.llm_interface:
                     log_info(f"Engine: Executing LLM task '{current_task.id}'")
-                    prompt = resolved_input.get("prompt", "")
-                    if not prompt: raise ValueError("Missing 'prompt' for LLM task.")
+                    # Handle file search context if enabled 
+                    if getattr(current_task, 'use_file_search', False) and 'prompt' in resolved_input:
+                        # Implementation for file search context handling
+                        log_info(f"Including file search context for LLM task '{current_task.id}'")
+                        # Placeholder for actual file search logic
                     
-                    # Create a copy of resolved_input without the prompt key to avoid passing it twice
-                    other_params = resolved_input.copy()
-                    other_params.pop("prompt", None)
-                    
-                    output = self.llm_interface.execute_llm_call(
-                        prompt=prompt, # Pass required args
-                        **other_params # Pass other resolved inputs as potential kwargs
-                        # TODO: Map specific LLM args if needed, like temperature etc.
-                    )
-
-                elif current_task.tool_name:
-                    if not self.tool_registry: raise RuntimeError(f"ToolRegistry needed for '{current_task.id}'.")
+                    # Execute the LLM call and ensure it returns standardized output
+                    raw_output = self.llm_interface.execute_llm_call(**resolved_input)
+                    output = validate_output_format(raw_output)
+                    current_task.set_output(output)
+                    success = output.get("success", False)
+                
+                elif current_task.tool_name and self.tool_registry:
                     tool_name = current_task.tool_name
-                    # Check tool existence using dictionary access
-                    if not hasattr(self.tool_registry, 'tools') or tool_name not in self.tool_registry.tools:
-                         raise ValueError(f"Tool '{tool_name}' not found in registry.")
                     log_info(f"Engine: Executing tool '{tool_name}' for task '{current_task.id}'")
-                    output = self.tool_registry.execute_tool(tool_name, resolved_input)
-
+                    
+                    # Check tool exists
+                    if not self.tool_registry.tool_exists(tool_name):
+                        raise ValueError(f"Tool '{tool_name}' not found in registry for task '{current_task.id}'")
+                    
+                    # Execute the tool and ensure it returns standardized output
+                    raw_output = self.tool_registry.execute_tool(tool_name, resolved_input)
+                    output = validate_output_format(raw_output)
+                    current_task.set_output(output)
+                    success = output.get("success", False)
+                
                 else:
-                    raise TypeError(f"Task '{current_task.id}' has unknown execution type.")
+                    # Unknown execution type
+                    error_msg = "Task has unknown or incomplete execution configuration."
+                    log_error(f"Engine: {error_msg} (task_id={current_task.id})")
+                    error_output = {
+                        "success": False,
+                        "status": "failed",
+                        "error": error_msg,
+                        "error_type": "ConfigurationError",
+                        "error_details": {
+                            "task_id": current_task.id,
+                            "has_tool_name": current_task.tool_name is not None,
+                            "has_tool_registry": self.tool_registry is not None,
+                            "is_llm_task": getattr(current_task, 'is_llm_task', False),
+                            "has_llm_interface": self.llm_interface is not None
+                        }
+                    }
+                    current_task.set_output(error_output)
+                    success = False
 
                 # 3. Process Output (Standardize and set status)
                 current_task.set_output(output) # This now also sets task status internally
@@ -442,14 +465,18 @@ class WorkflowEngine:
                 import traceback
                 log_error(f"Engine error executing task '{current_task.id}': {e}", exc_info=True)
                 # Ensure task output reflects the engine-level error
-                current_task.set_output({
+                error_output = {
                     "success": False,
+                    "status": "failed",
                     "error": f"Engine execution error: {str(e)}",
                     "error_type": type(e).__name__,
-                    "error_details": {"traceback": traceback.format_exc()},
-                    "status": "failed" # Explicitly set status in output dict
-                })
-                success = False # Ensure success is False
+                    "error_details": {
+                        "traceback": traceback.format_exc(),
+                        "message": str(e)
+                    }
+                }
+                current_task.set_output(error_output)
+                success = False
 
             # --- Handle Task Outcome ---
             if success:
@@ -569,12 +596,21 @@ class WorkflowEngine:
             else:
                 raise ValueError(f"Task '{task.id}' has unknown execution type")
                 
-            # Process output
-            task.set_output(output)
+            # Ensure output adheres to standardized format before setting it on the task
+            standardized_output = validate_output_format(output)
+            task.set_output(standardized_output)
             success = task.output_data.get('success', False)
             
             return success
         except Exception as e:
             log_error(f"Error executing task '{task.id}': {e}")
-            task.set_output({"success": False, "error": str(e), "status": "failed"})
+            # Create a standardized error response
+            error_output = {
+                "success": False, 
+                "status": "failed", 
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "error_details": {"exception_message": str(e)},
+            }
+            task.set_output(error_output)
             return False

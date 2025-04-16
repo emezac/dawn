@@ -16,6 +16,21 @@ from unittest.mock import MagicMock, patch, ANY
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
+# Create mock ChatPlannerConfig functions instead of patching the imports
+def mock_get_max_clarifications():
+    return 3
+
+# Mock the config module before importing the handler
+sys.modules['examples.chat_planner_config'] = MagicMock()
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig = MagicMock()
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_planning_system_message.return_value = "You are a planning assistant."
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_tokens.return_value = 1500
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_llm_temperature.return_value = 0.7
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_prompt.return_value = "Create a plan for: {user_request}"
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_validation_strictness.return_value = "medium"
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.is_plan_validation_enabled.return_value = True
+sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications.return_value = 3
+
 # Import the handlers to test
 from examples.chat_planner_workflow import (
     plan_user_request_handler,
@@ -125,30 +140,38 @@ class TestChatPlannerHandlers(unittest.TestCase):
 
     def test_plan_user_request_handler_success(self):
         """Test successful execution of plan_user_request_handler."""
-        # Setup mock LLM response
-        self.mock_llm_interface.execute_llm_call.return_value = {
-            "success": True,
-            "response": VALID_PLAN_JSON
-        }
+        # Directly mock the get_max_clarifications function using monkeypatch
+        original_func = sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications
+        sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications = mock_get_max_clarifications
 
-        # Execute handler
-        result = plan_user_request_handler(
-            self.mock_task,
-            {
-                "user_request": "Find the latest AI research and summarize it",
-                "available_tools_context": json.dumps(self.tool_details),
-                "available_handlers_context": json.dumps(self.handler_details),
-                "skip_ambiguity_check": True  # Skip ambiguity check to ensure only one LLM call
+        try:
+            # Setup mock LLM response
+            self.mock_llm_interface.execute_llm_call.return_value = {
+                "success": True,
+                "response": VALID_PLAN_JSON
             }
-        )
 
-        # Verify result
-        self.assertTrue(result["success"])
-        self.assertEqual(result["result"]["needs_clarification"], False)
-        self.assertEqual(result["result"]["raw_llm_output"], VALID_PLAN_JSON)
-        
-        # Verify LLM was called correctly
-        self.mock_llm_interface.execute_llm_call.assert_called_once()
+            # Execute handler
+            result = plan_user_request_handler(
+                self.mock_task,
+                {
+                    "user_request": "Find the latest AI research and summarize it",
+                    "available_tools_context": json.dumps(self.tool_details),
+                    "available_handlers_context": json.dumps(self.handler_details),
+                    "skip_ambiguity_check": True  # Skip ambiguity check to ensure only one LLM call
+                }
+            )
+
+            # Verify result
+            self.assertTrue(result["success"])
+            self.assertEqual(result["result"]["needs_clarification"], False)
+            self.assertEqual(result["result"]["raw_llm_output"], VALID_PLAN_JSON)
+            
+            # Verify LLM was called correctly
+            self.mock_llm_interface.execute_llm_call.assert_called_once()
+        finally:
+            # Restore original function
+            sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications = original_func
 
     def test_plan_user_request_handler_missing_request(self):
         """Test plan_user_request_handler with missing user_request."""
@@ -164,51 +187,67 @@ class TestChatPlannerHandlers(unittest.TestCase):
 
     def test_plan_user_request_handler_ambiguity_detection(self):
         """Test plan_user_request_handler when ambiguity is detected."""
-        # Setup mock LLM responses - first for ambiguity check, then for plan
-        ambiguity_response = {
-            "success": True,
-            "response": '{"needs_clarification": true, "ambiguity_details": [{"aspect": "scope", "description": "Scope is unclear", "clarification_question": "What timeframe?"}]}'
-        }
-        self.mock_llm_interface.execute_llm_call.return_value = ambiguity_response
+        # Directly mock the get_max_clarifications function using monkeypatch
+        original_func = sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications
+        sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications = mock_get_max_clarifications
 
-        # Execute handler
-        result = plan_user_request_handler(
-            self.mock_task,
-            {
-                "user_request": "Find some AI research",
-                "available_tools_context": json.dumps(self.tool_details),
-                "available_handlers_context": json.dumps(self.handler_details),
-                "clarification_count": 0
+        try:
+            # Setup mock LLM responses - first for ambiguity check, then for plan
+            ambiguity_response = {
+                "success": True,
+                "response": '{"needs_clarification": true, "ambiguity_details": [{"aspect": "scope", "description": "Scope is unclear", "clarification_question": "What timeframe?"}]}'
             }
-        )
+            self.mock_llm_interface.execute_llm_call.return_value = ambiguity_response
 
-        # Verify result indicates need for clarification
-        self.assertTrue(result["success"])
-        self.assertTrue(result["result"]["needs_clarification"])
-        self.assertEqual(len(result["result"]["ambiguity_details"]), 1)
-        self.assertEqual(result["result"]["ambiguity_details"][0]["aspect"], "scope")
+            # Execute handler
+            result = plan_user_request_handler(
+                self.mock_task,
+                {
+                    "user_request": "Find some AI research",
+                    "available_tools_context": json.dumps(self.tool_details),
+                    "available_handlers_context": json.dumps(self.handler_details),
+                    "clarification_count": 0
+                }
+            )
+
+            # Verify result indicates need for clarification
+            self.assertTrue(result["success"])
+            self.assertTrue(result["result"]["needs_clarification"])
+            self.assertEqual(len(result["result"]["ambiguity_details"]), 1)
+            self.assertEqual(result["result"]["ambiguity_details"][0]["aspect"], "scope")
+        finally:
+            # Restore original function
+            sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications = original_func
 
     def test_plan_user_request_handler_llm_failure(self):
         """Test plan_user_request_handler when LLM call fails."""
-        # Setup mock LLM to simulate failure
-        self.mock_llm_interface.execute_llm_call.return_value = {
-            "success": False,
-            "error": "LLM API error"
-        }
+        # Directly mock the get_max_clarifications function using monkeypatch
+        original_func = sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications
+        sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications = mock_get_max_clarifications
 
-        # Execute handler
-        result = plan_user_request_handler(
-            self.mock_task,
-            {
-                "user_request": "Find the latest AI research and summarize it",
-                "available_tools_context": json.dumps(self.tool_details),
-                "available_handlers_context": json.dumps(self.handler_details)
+        try:
+            # Setup mock LLM to simulate failure
+            self.mock_llm_interface.execute_llm_call.return_value = {
+                "success": False,
+                "error": "LLM API error"
             }
-        )
 
-        # Verify handler reports error
-        self.assertFalse(result["success"])
-        self.assertIn("Plan generation failed", result["error"])
+            # Execute handler
+            result = plan_user_request_handler(
+                self.mock_task,
+                {
+                    "user_request": "Find the latest AI research and summarize it",
+                    "available_tools_context": json.dumps(self.tool_details),
+                    "available_handlers_context": json.dumps(self.handler_details)
+                }
+            )
+
+            # Verify handler reports error
+            self.assertFalse(result["success"])
+            self.assertIn("Plan generation failed", result["error"])
+        finally:
+            # Restore original function
+            sys.modules['examples.chat_planner_config'].ChatPlannerConfig.get_max_clarifications = original_func
 
     def test_validate_plan_handler_success(self):
         """Test successful validation of a valid plan."""

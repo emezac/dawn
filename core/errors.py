@@ -37,12 +37,62 @@ class ErrorCategory(Enum):
 
 
 class ErrorCode:
-    """Standardized error codes for the Dawn framework.
+    """Standard error codes for the Dawn framework."""  # noqa: D202
+
+    # Framework-level errors
+    UNKNOWN_ERROR = "UNKNOWN_ERROR"
+    INITIALIZATION_ERROR = "INITIALIZATION_ERROR"
+    CONFIGURATION_ERROR = "CONFIGURATION_ERROR"
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    DEPENDENCY_ERROR = "DEPENDENCY_ERROR"
     
-    Format: <CATEGORY>_<DESCRIPTION>_<NUMBER>
-    Example: VALIDATION_MISSING_FIELD_101
-    """  # noqa: D202
+    # Task execution errors
+    TASK_EXECUTION_ERROR = "TASK_EXECUTION_ERROR"
+    TASK_OUTPUT_FORMAT_ERROR = "TASK_OUTPUT_FORMAT_ERROR"
+    TASK_INPUT_ERROR = "TASK_INPUT_ERROR"
+    TASK_TIMEOUT_ERROR = "TASK_TIMEOUT_ERROR"
+    TASK_DEPENDENCY_ERROR = "TASK_DEPENDENCY_ERROR"
     
+    # Workflow errors
+    WORKFLOW_EXECUTION_ERROR = "WORKFLOW_EXECUTION_ERROR"
+    WORKFLOW_VALIDATION_ERROR = "WORKFLOW_VALIDATION_ERROR"
+    WORKFLOW_INITIALIZATION_ERROR = "WORKFLOW_INITIALIZATION_ERROR"
+    
+    # Variable resolution errors
+    VARIABLE_RESOLUTION_ERROR = "VARIABLE_RESOLUTION_ERROR" 
+    VARIABLE_NOT_FOUND_ERROR = "VARIABLE_NOT_FOUND_ERROR"
+    VARIABLE_TYPE_ERROR = "VARIABLE_TYPE_ERROR"
+    VARIABLE_ACCESS_ERROR = "VARIABLE_ACCESS_ERROR"
+    
+    # Tool errors
+    TOOL_NOT_FOUND_ERROR = "TOOL_NOT_FOUND_ERROR"
+    TOOL_EXECUTION_ERROR = "TOOL_EXECUTION_ERROR"
+    TOOL_PARAMETER_ERROR = "TOOL_PARAMETER_ERROR"
+    
+    # Handler errors
+    HANDLER_NOT_FOUND_ERROR = "HANDLER_NOT_FOUND_ERROR"
+    HANDLER_EXECUTION_ERROR = "HANDLER_EXECUTION_ERROR"
+    HANDLER_PARAMETER_ERROR = "HANDLER_PARAMETER_ERROR"
+    
+    # LLM errors
+    LLM_CALL_ERROR = "LLM_CALL_ERROR"
+    LLM_RESPONSE_ERROR = "LLM_RESPONSE_ERROR"
+    LLM_CONTEXT_ERROR = "LLM_CONTEXT_ERROR"
+    LLM_PARSING_ERROR = "LLM_PARSING_ERROR"
+    
+    # Task state errors
+    TASK_STATE_ERROR = "TASK_STATE_ERROR"
+    TASK_NOT_FOUND_ERROR = "TASK_NOT_FOUND_ERROR"
+    TASK_ALREADY_EXECUTED_ERROR = "TASK_ALREADY_EXECUTED_ERROR"
+    
+    # Data format errors
+    JSON_PARSE_ERROR = "JSON_PARSE_ERROR"
+    DATA_SERIALIZATION_ERROR = "DATA_SERIALIZATION_ERROR"
+    DATA_VALIDATION_ERROR = "DATA_VALIDATION_ERROR"
+    
+    # Framework task errors
+    FRAMEWORK_TASK_ERROR = "FRAMEWORK_TASK_ERROR"
+
     # Validation errors (100-199)
     VALIDATION_MISSING_FIELD = "VALIDATION_MISSING_FIELD_101"
     VALIDATION_INVALID_TYPE = "VALIDATION_INVALID_TYPE_102"
@@ -406,118 +456,98 @@ class ResourceError(DawnError):
 
 # --- Response Creation Utilities ---
 
-def create_error_response(
-    message: Optional[str] = None,
-    error_code: str = ErrorCode.UNKNOWN_ERROR,
-    details: Optional[Dict[str, Any]] = None,
-    status_code: Optional[int] = None,
-    **kwargs
-) -> Dict[str, Any]:
-    """Create a standardized error response dictionary.
+def create_error_response(message: str, error_code: str = ErrorCode.UNKNOWN_ERROR, **kwargs) -> Dict[str, Any]:
+    """
+    Create a standardized error response dictionary.
     
     Args:
-        message: Human-readable error message (optional if using template)
+        message: Human-readable error message
         error_code: Error code from ErrorCode class
-        details: Additional error details 
-        status_code: Optional HTTP status code
-        **kwargs: Additional context variables for message template
+        **kwargs: Additional context to include in error_details
         
     Returns:
-        Standardized error response dictionary
+        A standardized error response dictionary
     """
-    details = details or {}
+    error_details = {}
     
-    # Update details with any provided kwargs
-    details.update({k: v for k, v in kwargs.items() if k not in ['message', 'error_code', 'details', 'status_code']})
+    # Extract specific known fields from kwargs
+    if "source_task_id" in kwargs:
+        error_details["source_task_id"] = kwargs.pop("source_task_id")
+    if "target_task_id" in kwargs:
+        error_details["target_task_id"] = kwargs.pop("target_task_id")
+    if "traceback" in kwargs:
+        error_details["traceback"] = kwargs.pop("traceback")
     
-    # Generate the message if not provided using the template system
-    if message is None:
-        message = get_error_message(error_code, **details)
+    # Add any remaining kwargs to error_details
+    error_details.update(kwargs)
     
-    response = {
+    # Create the standardized error response
+    return {
         "success": False,
-        "status": "error",
+        "status": "failed",
         "error": message,
         "error_code": error_code,
-        "timestamp": datetime.now().isoformat()
+        "error_type": "DawnError",
+        "error_details": error_details,
+        "result": None,
+        "response": None
     }
-    
-    if details:
-        response["error_details"] = details
-        
-    if status_code:
-        response["status_code"] = status_code
-        
-    return response
 
 
-def create_success_response(
-    result: Any,
-    message: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """Create a standardized success response dictionary.
+def create_success_response(result: Any, metadata: Optional[Dict[str, Any]] = None, 
+                           warning: Optional[str] = None, warning_code: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Create a standardized success response dictionary.
     
     Args:
-        result: The result data
-        message: Optional success message
-        metadata: Optional metadata about the operation
+        result: The primary output data
+        metadata: Optional metadata dictionary
+        warning: Optional warning message
+        warning_code: Optional warning code
         
     Returns:
-        Standardized success response dictionary
+        A standardized success response dictionary
     """
     response = {
         "success": True,
-        "status": "success",
+        "status": "completed" if not warning else "warning",
         "result": result,
-        "response": result,  # For backward compatibility
-        "timestamp": datetime.now().isoformat()
+        "response": result
     }
     
-    if message:
-        response["message"] = message
-        
     if metadata:
         response["metadata"] = metadata
+    else:
+        response["metadata"] = {}
         
-    return response
-
-
-def create_warning_response(
-    result: Any,
-    warning: str,
-    warning_code: Optional[str] = None,
-    details: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """Create a standardized warning response dictionary.
-    
-    This is for cases where the operation succeeded but with warnings.
-    
-    Args:
-        result: The result data
-        warning: Human-readable warning message
-        warning_code: Optional warning code
-        details: Additional warning details
-        
-    Returns:
-        Standardized warning response dictionary
-    """
-    response = {
-        "success": True,
-        "status": "warning",
-        "result": result,
-        "response": result,  # For backward compatibility
-        "warning": warning,
-        "timestamp": datetime.now().isoformat()
-    }
-    
+    if warning:
+        response["warning"] = warning
     if warning_code:
         response["warning_code"] = warning_code
         
-    if details:
-        response["warning_details"] = details
-        
     return response
+
+
+def create_warning_response(result: Any, warning: str, warning_code: Optional[str] = None, 
+                           metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Create a standardized warning response dictionary (success with warning).
+    
+    Args:
+        result: The primary output data
+        warning: Warning message
+        warning_code: Optional warning code
+        metadata: Optional metadata dictionary
+        
+    Returns:
+        A standardized warning response dictionary
+    """
+    return create_success_response(
+        result=result,
+        metadata=metadata,
+        warning=warning,
+        warning_code=warning_code
+    )
 
 
 # --- Error Handling Wrapper ---

@@ -1,0 +1,26 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.14, pytest-8.3.5, pluggy-1.5.0 -- /Users/admin/code/newstart/dawn/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/admin/code/newstart/dawn
+configfile: pytest.ini
+plugins: anyio-4.9.0
+collecting ... collected 16 items
+
+tests/core/test_plan_validation.py::TestPlanValidation::test_circular_dependency_detection PASSED [  6%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_duplicate_step_id_detection PASSED [ 12%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_invalid_dependency_detection PASSED [ 18%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_invalid_output_reference_field_warning PASSED [ 25%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_invalid_output_reference_step_error PASSED [ 31%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_json_recovery_function PASSED [ 37%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_json_schema_validation PASSED [ 43%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_llm_assisted_validation_called_on_failure PASSED [ 50%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_llm_validation_function PASSED [ 56%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_llm_validation_with_valid_plan PASSED [ 62%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_multiple_validation_errors PASSED [ 68%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_valid_plan_passes_validation PASSED [ 75%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_validate_plan_handler_missing_input_dict PASSED [ 81%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_validate_plan_handler_no_tools_or_handlers_provided PASSED [ 87%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_validation_strictness_levels PASSED [ 93%]
+tests/core/test_plan_validation.py::TestPlanValidation::test_validation_with_disabled_validation PASSED [100%]
+
+============================== 16 passed in 0.53s ==============================

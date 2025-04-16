@@ -131,11 +131,21 @@ def plan_user_request_handler(task: DirectHandlerTask, input_data: dict) -> dict
         logger.warning(f"plan_user_request_handler received non-bool skip_ambiguity_check ({type(skip_ambiguity_check)}), using False.")
         skip_ambiguity_check = False
 
+    # Get max_clarifications with better error handling
     try:
         max_clarifications = ChatPlannerConfig.get_max_clarifications()
-    except AttributeError:
-        logger.warning("ChatPlannerConfig.get_max_clarifications() not found. Defaulting to 3.")
+        # Ensure max_clarifications is an integer 
+        if not isinstance(max_clarifications, int):
+            logger.warning(f"ChatPlannerConfig.get_max_clarifications() returned non-int value: {max_clarifications}, defaulting to 3")
+            max_clarifications = 3
+    except Exception as e:
+        logger.warning(f"Error calling ChatPlannerConfig.get_max_clarifications(): {e}. Defaulting to 3.")
         max_clarifications = 3
+        
+    # Add extra debug logging
+    logger.debug(f"max_clarifications: {max_clarifications} (type: {type(max_clarifications)})")
+    logger.debug(f"clarification_count: {clarification_count} (type: {type(clarification_count)})")
+    logger.debug(f"skip_ambiguity_check: {skip_ambiguity_check} (type: {type(skip_ambiguity_check)})")
 
 
     if not user_request:
@@ -177,9 +187,7 @@ def plan_user_request_handler(task: DirectHandlerTask, input_data: dict) -> dict
                 logger.info("Checking request for ambiguity using LLM...")
                 ambiguity_response = llm_interface.execute_llm_call(
                     prompt=ambiguity_prompt,
-                    system_message=ChatPlannerConfig.get_planning_system_message(),
-                    max_tokens=ChatPlannerConfig.get_max_tokens(),
-                    temperature=ChatPlannerConfig.get_llm_temperature()
+                    system_message=ChatPlannerConfig.get_planning_system_message()
                 )
 
                 if ambiguity_response.get("success"):
@@ -238,9 +246,7 @@ def plan_user_request_handler(task: DirectHandlerTask, input_data: dict) -> dict
 
         plan_response = llm_interface.execute_llm_call(
             prompt=planning_prompt,
-            system_message=ChatPlannerConfig.get_planning_system_message(),
-            max_tokens=ChatPlannerConfig.get_max_tokens(),
-            temperature=ChatPlannerConfig.get_llm_temperature()
+            system_message=ChatPlannerConfig.get_planning_system_message()
         )
 
         if not plan_response.get("success"):

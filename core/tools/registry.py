@@ -116,6 +116,18 @@ class ToolRegistry:
         """
         return self.tools.get(name)
 
+    def tool_exists(self, name: str) -> bool:
+        """
+        Check if a tool with the given name exists in the registry.
+
+        Args:
+            name: The name of the tool to check.
+
+        Returns:
+            True if the tool exists, False otherwise.
+        """
+        return name in self.tools
+
     def execute_tool(self, name: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute a registered tool using the provided input data.
