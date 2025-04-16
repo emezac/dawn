@@ -132,6 +132,20 @@ class FileReadTool:
             return f"An error occurred: {str(e)}"
 
 
+def register(tool_registry):
+    """Register the file read tool with the tool registry."""
+    tool_registry.register_tool("file_read", lambda input_data: {
+        "success": True,
+        "result": FileReadTool().perform_file_read(
+            input_data.get("vector_store_ids", []),
+            input_data.get("query", ""),
+            input_data.get("max_num_results", 5),
+            input_data.get("include_search_results", False)
+        )
+    })
+    print("File read tool registered")
+
+
 # Example usage (for testing)
 if __name__ == "__main__":
     tool = FileReadTool()

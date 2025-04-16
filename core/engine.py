@@ -9,7 +9,8 @@ tasks in the correct order, handling dependencies, and managing execution.
 import re
 import json # Import json for parsing default values
 import asyncio
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional, Callable, Union
+import traceback # Add traceback import
 
 # Core imports
 from core.llm.interface import LLMInterface
@@ -18,7 +19,7 @@ from core.task import Task, DirectHandlerTask, TaskOutput, validate_output_forma
 from core.tools.registry import ToolRegistry
 from core.workflow import Workflow
 # --- IMPORT ErrorCode CORRECTAMENTE ---
-from core.errors import ErrorCode # Asegúrate que ErrorCode se importe desde aquí
+from core.errors import ErrorCode, DawnError # Ensure DawnError is imported if used
 # ------------------------------------
 from core.error_propagation import ErrorContext
 # Assuming ServiceContainer might be type hinted, import if necessary
@@ -143,8 +144,16 @@ class WorkflowEngine:
         if hasattr(self.workflow, 'variables') and isinstance(self.workflow.variables, dict):
              resolution_context.update(self.workflow.variables)
         for task_id, t in self.workflow.tasks.items():
-            if t.status in ["completed", "failed"] and t.id != task.id:
-                 resolution_context[task_id] = t.output_data
+            # Ensure the task has output data and it's likely a TaskOutput object
+            if t.status in ["completed", "failed"] and t.id != task.id and hasattr(t, 'output_data') and t.output_data:
+                 # Use the dictionary representation of the output for resolution
+                 if hasattr(t.output_data, 'to_dict') and callable(t.output_data.to_dict):
+                     resolution_context[task_id] = t.output_data.to_dict()
+                 elif isinstance(t.output_data, dict):
+                     resolution_context[task_id] = t.output_data # Already a dict
+                 else:
+                      log_warning(f"[PROCESS_INPUT] Task '{t.id}' output_data is not a dict or TaskOutput object, skipping for context.")
+
         resolution_context['error'] = self.error_context.task_errors
 
         # --- Import resolve_path here ---
@@ -180,14 +189,20 @@ class WorkflowEngine:
                     resolution_failed_permanently = False # Indicates fatal error like ImportError
 
                     try:
-                        # Attempt to resolve the main variable path
-                        resolved_part = resolve_path(resolution_context, match_expression)
-                        found_part = True # Found (even if value is None)
-                        log_info(f"[PROCESS_INPUT:{task.id}] Resolved '{match_expression}' to type: {type(resolved_part)}")
+                        # ---- Check for top-level variable first ----
+                        if '.' not in match_expression and match_expression in resolution_context:
+                            resolved_part = resolution_context[match_expression]
+                            found_part = True
+                            log_info(f"[PROCESS_INPUT:{task.id}] Resolved top-level variable '{match_expression}' to type: {type(resolved_part)}")
+                        else:
+                            # ---- Attempt nested path resolution ----
+                            resolved_part = resolve_path(resolution_context, match_expression)
+                            found_part = True # Found (even if value is None)
+                            log_info(f"[PROCESS_INPUT:{task.id}] Resolved nested path '{match_expression}' to type: {type(resolved_part)}")
 
                     except (KeyError, IndexError, AttributeError, TypeError, ValueError) as e:
-                        # Variable not found, check for default
-                        log_warning(f"[PROCESS_INPUT:{task.id}] Could not resolve '{match_expression}': {type(e).__name__}. Checking for default.")
+                        # Variable not found (neither top-level nor nested), check for default
+                        log_warning(f"[PROCESS_INPUT:{task.id}] Could not resolve '{match_expression}' (checked top-level and nested): {type(e).__name__}. Checking for default.")
                         if default_value_str is not None:
                              try:
                                 # Try parsing default as JSON (handles lists, dicts, bools, null)
@@ -253,9 +268,10 @@ class WorkflowEngine:
 
 
     def handle_task_failure(self, task: Task, failure_output: TaskOutput) -> bool:
-        """Handles task failure, including retries and final failure state."""
-        task.set_output(failure_output) # Ensure task state reflects failure
-        self.error_context.record_task_error(task.id, task.output_data)
+        """Handles task failure, including retry logic and recording errors."""
+        task.set_output(failure_output) # failure_output is already a TaskOutput object
+        # Record the error using the guaranteed dictionary format from the TaskOutput
+        self.error_context.record_task_error(task.id, failure_output.to_dict())
 
         if task.can_retry():
             task.increment_retry()
@@ -324,203 +340,147 @@ class WorkflowEngine:
          return None
 
     def run(self, initial_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Executes the defined workflow sequentially based on task order and branching.
-        """
+        """Executes the workflow tasks respecting dependencies."""
         log_workflow_start(self.workflow.id, self.workflow.name)
         self.workflow.set_status("running")
 
-        if initial_input is not None:
-            if not hasattr(self.workflow, 'variables') or not isinstance(self.workflow.variables, dict):
-                self.workflow.variables = {} # Initialize if needed
+        if initial_input:
             self.workflow.variables.update(initial_input)
             log_info(f"Initialized/Updated workflow variables: {self.workflow.variables}")
 
-        if not hasattr(self.workflow, 'task_order') or not self.workflow.task_order:
-             log_error(f"Workflow '{self.workflow.id}' has no task_order defined. Cannot execute.")
-             self.workflow.set_status("failed")
-             self.workflow.set_error("Workflow has no task execution order defined.", ErrorCode.WORKFLOW_CONFIGURATION_ERROR) # Check ErrorCode name
-             return self._get_final_result()
+        completed_task_ids = set()
+        # Get a mutable list of task IDs that need to be run
+        tasks_to_process = list(self.workflow.task_order)
+        task_map = self.workflow.tasks
+        tasks_processed_in_pass = -1 # Ensure loop runs at least once
 
-        current_task_id: Optional[str] = self.workflow.task_order[0]
-        executed_task_ids = set() # Simple loop prevention
+        # Loop until no tasks are left or no progress can be made
+        while tasks_to_process and tasks_processed_in_pass != 0:
+            tasks_processed_in_pass = 0
+            remaining_tasks_for_next_pass = []
+            runnable_tasks_this_pass = []
 
-        while current_task_id is not None:
-            # --- Loop Detection ---
-            if current_task_id in executed_task_ids:
-                  log_error(f"Workflow execution stopped due to potential loop (re-encountered task '{current_task_id}').")
-                  self.workflow.set_status("failed")
-                  self.workflow.set_error(f"Workflow loop detected at task '{current_task_id}'.", ErrorCode.WORKFLOW_EXECUTION_ERROR, task_id=current_task_id) # Check ErrorCode name
-                  break
-            executed_task_ids.add(current_task_id)
-            # --------------------
+            # Identify all runnable tasks in the current list
+            for task_id in tasks_to_process:
+                task = task_map.get(task_id)
+                if not task:
+                    log_error(f"Task ID '{task_id}' in queue but not found in workflow tasks. Skipping.")
+                    tasks_processed_in_pass += 1 # Count as processed to avoid infinite loop
+                    continue
 
-            current_task = self._get_task_by_id(current_task_id)
-            if current_task is None:
-                log_error(f"Task ID '{current_task_id}' specified in task_order or branch not found. Stopping.")
-                self.workflow.set_status("failed")
-                self.workflow.set_error(f"Task '{current_task_id}' not found.", ErrorCode.WORKFLOW_CONFIGURATION_ERROR, task_id=current_task_id) # Check ErrorCode name
-                break
+                dependencies = getattr(task, 'depends_on', [])
+                if not isinstance(dependencies, list):
+                    log_warning(f"Task '{task_id}' has non-list depends_on attribute: {dependencies}. Treating as no dependencies.")
+                    dependencies = []
 
-            # Only execute tasks that are pending
-            if current_task.status != "pending":
-                log_info(f"Task '{current_task.id}' status is '{current_task.status}', skipping execution phase.")
-                # Decide next step based on its *current* status
-                next_task_id = self.get_next_task_id(current_task)
-                current_task_id = next_task_id
-                continue
-
-            # --- Execute the pending task ---
-            log_task_start(current_task.id, current_task.name, self.workflow.id)
-            success = False
-            output: Optional[Dict] = None # Ensure output is initialized
-
-            try:
-                # 1. Resolve Inputs
-                resolved_input = self.process_task_input(current_task)
-                current_task.set_status("running")
-
-                # 2. Execute based on Type (Dispatch Logic)
-                if isinstance(current_task, DirectHandlerTask):
-                    handler_name = current_task.handler_name
-                    handler = None
-                    if callable(current_task.handler):
-                         handler = current_task.handler
-                         handler_source = "direct callable"
-                    elif handler_name and self.handler_registry:
-                         handler = self.handler_registry.get_handler(handler_name)
-                         handler_source = f"registry lookup ('{handler_name}')"
-                         if not handler: raise ValueError(f"Handler '{handler_name}' not found in registry.")
-                    elif handler_name: raise ValueError(f"Handler '{handler_name}' needs registry, but registry not available.")
-                    else: raise ValueError(f"DirectHandlerTask '{current_task.id}' misconfigured.")
-
-                    log_info(f"Engine: Executing {handler_source} for task '{current_task.id}'")
-                    # Execute the handler and ensure it returns standardized output
-                    raw_output = handler(current_task, resolved_input)
-                    output = validate_output_format(raw_output)
-                    current_task.set_output(output)
-                    success = output.get("success", False)
-
-                elif getattr(current_task, 'is_llm_task', False) and self.llm_interface:
-                    log_info(f"Engine: Executing LLM task '{current_task.id}'")
-                    # Handle file search context if enabled 
-                    if getattr(current_task, 'use_file_search', False) and 'prompt' in resolved_input:
-                        # Implementation for file search context handling
-                        log_info(f"Including file search context for LLM task '{current_task.id}'")
-                        # Placeholder for actual file search logic
-                    
-                    # Execute the LLM call and ensure it returns standardized output
-                    raw_output = self.llm_interface.execute_llm_call(**resolved_input)
-                    output = validate_output_format(raw_output)
-                    current_task.set_output(output)
-                    success = output.get("success", False)
-                
-                elif current_task.tool_name and self.tool_registry:
-                    tool_name = current_task.tool_name
-                    log_info(f"Engine: Executing tool '{tool_name}' for task '{current_task.id}'")
-                    
-                    # Check tool exists
-                    if not self.tool_registry.tool_exists(tool_name):
-                        raise ValueError(f"Tool '{tool_name}' not found in registry for task '{current_task.id}'")
-                    
-                    # Execute the tool and ensure it returns standardized output
-                    raw_output = self.tool_registry.execute_tool(tool_name, resolved_input)
-                    output = validate_output_format(raw_output)
-                    current_task.set_output(output)
-                    success = output.get("success", False)
-                
+                # Check if all dependencies are met
+                if all(dep_id in completed_task_ids for dep_id in dependencies):
+                    runnable_tasks_this_pass.append(task)
                 else:
-                    # Unknown execution type
-                    error_msg = "Task has unknown or incomplete execution configuration."
-                    log_error(f"Engine: {error_msg} (task_id={current_task.id})")
-                    error_output = {
-                        "success": False,
-                        "status": "failed",
-                        "error": error_msg,
-                        "error_type": "ConfigurationError",
-                        "error_details": {
-                            "task_id": current_task.id,
-                            "has_tool_name": current_task.tool_name is not None,
-                            "has_tool_registry": self.tool_registry is not None,
-                            "is_llm_task": getattr(current_task, 'is_llm_task', False),
-                            "has_llm_interface": self.llm_interface is not None
-                        }
-                    }
-                    current_task.set_output(error_output)
-                    success = False
+                    # Dependencies not met, keep for the next pass
+                    remaining_tasks_for_next_pass.append(task_id)
 
-                # 3. Process Output (Standardize and set status)
-                current_task.set_output(output) # This now also sets task status internally
-                success = current_task.output_data.get('success', False)
-                        # --- DEBUG: Log output of think_analyze_plan ---
-                if current_task.id == 'think_analyze_plan':
-                    import pprint
-                    print("\n--- DEBUG: Output data from 'think_analyze_plan' ---")
-                    pprint.pprint(current_task.output_data)
-                    print("--- END DEBUG ---\n")
-                # ---------------------------------------------
+            # --- Execute all runnable tasks found in this pass ---            
+            for current_task in runnable_tasks_this_pass:
+                tasks_processed_in_pass += 1
+                log_task_start(current_task.id, current_task.name, self.workflow.id)
+                task_output = None
 
-            except Exception as e:
-                # Catch errors during resolution, dispatch, or execution call
-                import traceback
-                log_error(f"Engine error executing task '{current_task.id}': {e}", exc_info=True)
-                # Ensure task output reflects the engine-level error
-                error_output = {
-                    "success": False,
-                    "status": "failed",
-                    "error": f"Engine execution error: {str(e)}",
-                    "error_type": type(e).__name__,
-                    "error_details": {
-                        "traceback": traceback.format_exc(),
-                        "message": str(e)
-                    }
-                }
-                current_task.set_output(error_output)
-                success = False
+                try:
+                    # Process inputs (variable resolution)
+                    processed_input = self.process_task_input(current_task)
+                    current_task.processed_input = processed_input
+                    log_task_input(current_task.id, processed_input)
 
-            # --- Handle Task Outcome ---
-            if success:
-                 log_task_end(current_task.id, current_task.name, "completed", self.workflow.id)
-                 next_task_id = self.get_next_task_id(current_task)
-                 current_task_id = next_task_id # Move to next task ID
-            else:
-                 # Failure occurred
-                 should_continue = self.handle_task_failure(current_task, current_task.output_data)
-                 if should_continue:
-                      # Check if retry was triggered (status reset to pending)
-                      if current_task.status == "pending":
-                           executed_task_ids.remove(current_task_id) # Allow re-execution
-                           log_info(f"Task '{current_task_id}' will be retried.")
-                           # Stay on the current task ID for the next loop iteration
-                           continue
-                      else:
-                           # No retry, move to failure path if defined
-                           next_task_id = self.get_next_task_id(current_task) # Gets failure path ID
-                           current_task_id = next_task_id
-                           log_info(f"Proceeding to failure path task: {current_task_id}")
-                 else:
-                      # Permanent failure, stop workflow.
-                      self.workflow.set_status("failed")
-                      latest_error = self.error_context.get_task_error(current_task.id)
-                      # --- USE CORRECT ErrorCode ---
-                      # Ensure EXECUTION_TASK_FAILED exists in core/errors.py
-                      error_code_to_use = ErrorCode.EXECUTION_TASK_FAILED
-                      # -----------------------------
-                      self.workflow.set_error(
-                            latest_error.get("error", f"Task '{current_task.id}' failed.") if latest_error else f"Task '{current_task.id}' failed.",
-                            latest_error.get("error_code", error_code_to_use) if latest_error else error_code_to_use,
-                            task_id=current_task.id # Pass task_id if set_error accepts it
+                    # Execute task
+                    task_result_raw = self.execute_task(current_task)
+
+                    # Validate and standardize the raw output
+                    if isinstance(task_result_raw, TaskOutput):
+                        task_output = task_result_raw # Already a TaskOutput object
+                    elif isinstance(task_result_raw, dict):
+                        task_output = validate_output_format(task_result_raw)
+                    else:
+                        # Handle cases where execute_task returns neither dict nor TaskOutput
+                        log_error(f"Task '{current_task.id}' execute_task returned unexpected type: {type(task_result_raw)}. Creating error output.")
+                        task_output = TaskOutput(
+                            success=False,
+                            status="failed",
+                            error=f"Task execution returned unexpected type: {type(task_result_raw)}",
+                            result=task_result_raw,
+                            error_code=ErrorCode.UNEXPECTED_OUTPUT_TYPE
                         )
-                      current_task_id = None # Stop the loop
 
-        # --- End of Workflow Loop ---
+                    # Now task_output is guaranteed to be a TaskOutput instance
+                    current_task.set_output(task_output)
+                    log_task_output(current_task.id, task_output.to_dict())
+
+                    # Handle Task Completion/Failure based on the TaskOutput object
+                    if task_output.success:
+                        log_task_end(current_task.id, current_task.name, "completed", self.workflow.id)
+                        completed_task_ids.add(current_task.id)
+                    else:
+                        log_task_end(current_task.id, current_task.name, "failed", self.workflow.id)
+                        self.error_context.record_task_error(current_task.id, task_output.to_dict())
+                        should_retry = self.handle_task_failure(current_task, task_output)
+                        if should_retry:
+                            log_task_retry(current_task.id, current_task.retries)
+                            # Add back to the list for the next pass if retrying
+                            remaining_tasks_for_next_pass.append(current_task.id)
+                            tasks_processed_in_pass -= 1 # Don't count retry initiation as progress for stall detection
+                        else:
+                            if self.workflow.status != "failed":
+                                self.workflow.set_error(
+                                    f"Task '{current_task.id}' failed permanently.",
+                                    ErrorCode.EXECUTION_TASK_FAILED,
+                                    current_task.id
+                                )
+                            # Failed task is not added back, effectively removed
+
+                except Exception as e:
+                    error_msg = f"Engine error during task '{current_task.id}' execution: {type(e).__name__}: {e}"
+                    log_error(error_msg, exc_info=True)
+                    tb_str = traceback.format_exc()
+                    # Ensure we create a TaskOutput here as well
+                    task_output = TaskOutput(status="failed", success=False, error=error_msg, error_code=ErrorCode.ENGINE_ERROR, error_details={"traceback": tb_str})
+                    current_task.set_output(task_output)
+                    # Use the correct method: record_task_error
+                    self.error_context.record_task_error(current_task.id, task_output.to_dict()) 
+                    if self.workflow.status != "failed":
+                        self.workflow.set_error(
+                            f"Engine error during task '{current_task.id}'.",
+                            ErrorCode.ENGINE_ERROR,
+                            current_task.id
+                        )
+                    # Failed task is not added back
+
+            # Update the list of tasks to process for the next iteration
+            tasks_to_process = remaining_tasks_for_next_pass
+
+        # --- End of main loop --- 
+
+        # Check for stall condition (tasks remain but none were processed in the last pass)
+        if tasks_to_process and tasks_processed_in_pass == 0:
+            error_msg = f"Workflow stalled: Tasks {tasks_to_process} remain but cannot run. Check for circular dependencies or missing tasks."
+            log_error(error_msg)
+            if self.workflow.status != "failed":
+                self.workflow.set_error(error_msg, ErrorCode.WORKFLOW_STALLED)
+
+        # Final workflow status determination
         if self.workflow.status != "failed":
-             # If loop finished because current_task_id is None (natural end)
-             if current_task_id is None:
-                  self.workflow.set_status("completed")
-             # else: loop might have exited due to other reasons (e.g., explicit stop command - not implemented here)
+            all_tasks_in_workflow_completed = all(
+                task.status == "completed" for task in self.workflow.tasks.values()
+            )
+            if all_tasks_in_workflow_completed:
+                 self.workflow.set_status("completed")
+            else:
+                # If not explicitly failed but not all tasks completed, mark as failed
+                self.workflow.set_status("failed")
+                if not self.workflow.error:
+                    self.workflow.set_error("Workflow finished but not all tasks completed successfully.", ErrorCode.WORKFLOW_INCOMPLETE)
 
-        return self._get_final_result() # Always return final result
+        log_workflow_end(self.workflow.id, self.workflow.name, self.workflow.status)
+        return self._get_final_result()
 
     def _get_final_result(self) -> Dict[str, Any]:
          """Constructs the final result dictionary for the workflow execution."""
@@ -566,51 +526,65 @@ class WorkflowEngine:
             log_info(f"WorkflowEngine switched to execute new workflow '{workflow.name}' (ID: {workflow.id})")
         return self.run(initial_input=initial_input)
         
-    def execute_task(self, task):
+    def execute_task(self, task: Task) -> Union[TaskOutput, Dict, Any]: # Update return type hint
         """
-        Execute a single task for testing purposes.
-        
-        This method is provided for backward compatibility with tests.
-        In production code, use run() which executes full workflows.
-        
-        Args:
-            task: The task to execute
-            
+        Execute a single task based on its type (DirectHandler, LLM, Tool).
+
         Returns:
-            bool: True if task executed successfully, False otherwise
+            A TaskOutput object or a dictionary that can be standardized by validate_output_format.
+            Can also return Any in case of unexpected failures before standardization.
         """
         try:
-            log_info(f"Executing single task '{task.id}' for testing purposes")
-            
-            # Resolve inputs
-            resolved_input = self.process_task_input(task)
+            resolved_input = task.processed_input # Use already processed input
             task.set_status("running")
-            
-            # Execute based on type
-            if isinstance(task, DirectHandlerTask) and callable(task.handler):
-                output = task.execute(resolved_input)
-            elif getattr(task, 'is_llm_task', False):
-                output = self.llm_interface.execute_llm_call(prompt=resolved_input.get("prompt", ""))
-            elif task.tool_name:
-                output = self.tool_registry.execute_tool(task.tool_name, resolved_input)
-            else:
-                raise ValueError(f"Task '{task.id}' has unknown execution type")
+
+            if isinstance(task, DirectHandlerTask):
+                handler = None
+                handler_source = "unknown"
+                if callable(task.handler):
+                    handler = task.handler
+                    handler_source = "direct callable"
+                elif task.handler_name and self.handler_registry:
+                    handler = self.handler_registry.get_handler(task.handler_name)
+                    handler_source = f"registry ('{task.handler_name}')"
+                    if not handler: raise ValueError(f"Handler '{task.handler_name}' not found in registry.")
+                elif task.handler_name:
+                    raise ValueError(f"Handler '{task.handler_name}' requires registry, but registry not available.")
+                else:
+                    raise ValueError(f"DirectHandlerTask '{task.id}' has no valid handler specified.")
                 
-            # Ensure output adheres to standardized format before setting it on the task
-            standardized_output = validate_output_format(output)
-            task.set_output(standardized_output)
-            success = task.output_data.get('success', False)
-            
-            return success
+                log_info(f"Executing {handler_source} for task '{task.id}'")
+                # Execute the handler
+                raw_output = handler(task, resolved_input)
+                # Return the raw output (dict expected, but could be TaskOutput)
+                return raw_output 
+
+            elif getattr(task, 'is_llm_task', False) and self.llm_interface:
+                log_info(f"Executing LLM task '{task.id}'")
+                # LLM Interface should ideally return a dict or TaskOutput
+                raw_output = self.llm_interface.execute_llm_call(**resolved_input)
+                return raw_output
+
+            elif task.tool_name and self.tool_registry:
+                tool_name = task.tool_name
+                log_info(f"Executing tool '{tool_name}' for task '{task.id}'")
+                if not self.tool_registry.tool_exists(tool_name):
+                    raise ValueError(f"Tool '{tool_name}' not found in registry.")
+                # ToolRegistry should ideally return a dict or TaskOutput
+                raw_output = self.tool_registry.execute_tool(tool_name, resolved_input)
+                return raw_output
+
+            else:
+                raise ValueError(f"Task '{task.id}' has unknown or incomplete execution configuration.")
+
         except Exception as e:
-            log_error(f"Error executing task '{task.id}': {e}")
-            # Create a standardized error response
-            error_output = {
-                "success": False, 
-                "status": "failed", 
-                "error": str(e),
+            log_error(f"Error during task '{task.id}' execution dispatch: {e}", exc_info=True)
+            # Return an error dictionary to be standardized by the caller (run method)
+            return {
+                "success": False,
+                "status": "failed",
+                "error": f"Error executing task: {str(e)}",
+                "error_code": ErrorCode.TASK_EXECUTION_ERROR,
                 "error_type": type(e).__name__,
-                "error_details": {"exception_message": str(e)},
+                "error_details": {"traceback": traceback.format_exc()}
             }
-            task.set_output(error_output)
-            return False

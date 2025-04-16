@@ -8,65 +8,81 @@ It supports complex nested data structures and offers robust error handling.
 import re
 from typing import Any, Dict, List, Optional, Union
 
+# Import TaskOutput if it's defined elsewhere, otherwise assume it's available
+# from ..task import TaskOutput # Example relative import if needed
 
-def resolve_path(data: Dict[str, Any], path: str) -> Any:
+def resolve_path(data: Any, path: str) -> Any:
     """
-    Resolve a dot notation path in a nested data structure.
+    Resolve a dot notation path in a nested data structure (dict, list, or object).
     
     Args:
-        data: The data structure to traverse
-        path: A dot-notation path like "field1.field2[0].field3"
+        data: The data structure (dict, list, object) to traverse
+        path: A dot-notation path like "field1.field2[0].attribute3"
         
     Returns:
         The value at the specified path
         
     Raises:
-        KeyError: If a dictionary key or attribute is not found
+        KeyError: If a dictionary key is not found
+        AttributeError: If an object attribute is not found
         IndexError: If an array index is out of bounds
-        ValueError: If the path syntax is invalid
+        ValueError: If the path syntax is invalid or traversal fails
     """
     if not path:
         return data
     
-    # Initialize with the root data
     current = data
     
-    # Split the path into parts (handling special indexing syntax)
-    path_parts = []
-    
-    # Regular expression to match array indexing
-    index_pattern = re.compile(r'(\w+)(\[\d+\])+')
-    
-    for part in path.split('.'):
-        # Check if the part contains array indexing
-        match = index_pattern.match(part)
-        if match:
-            # Extract the base field name
-            field_name = match.group(1)
-            path_parts.append(field_name)
+    # Regex to split path by dots, but not dots within brackets []
+    # And also captures array indexing like [0]
+    # Parts can be: field_name, [index], .attribute_name
+    parts = re.findall(r'\.([\w_]+)|\[(\d+)\]|([\w_]+)', '.' + path) # Prepend dot to handle leading field
+
+    for dot_attr, index, first_field in parts:
+        part = dot_attr or first_field # Prioritize dot access/first field
+        index_val = int(index) if index is not None else None
+
+        if index_val is not None:
+            # Handle list/tuple indexing
+            if isinstance(current, (list, tuple)):
+                if 0 <= index_val < len(current):
+                    current = current[index_val]
+                else:
+                    raise IndexError(f"Index {index_val} out of bounds for list/tuple of length {len(current)} in path '{path}'")
+            else:
+                raise ValueError(f"Cannot apply index [{index_val}] to non-list/tuple type {type(current).__name__} in path '{path}'")
+        elif part: # Handle dict key or object attribute
+            if isinstance(current, dict):
+                # Use get() for safer access, returning None if key missing
+                value = current.get(part)
+                if value is not None:
+                     current = value
+                # --- Levantar KeyError si la clave NO existe ---
+                elif part not in current: # Check explicitly if key is absent
+                     raise KeyError(f"Key '{part}' not found in dictionary in path '{path}'")
+                # --- Si la clave existe pero el valor es None, current se vuelve None ---
+                else:
+                     current = None # Allow resolving path to None
+
+            # Check if it's an object with attributes (and not a list/tuple/dict already handled)
+            elif hasattr(current, part):
+                 try:
+                     current = getattr(current, part)
+                 except AttributeError: # Catch specific AttributeError
+                     raise AttributeError(f"Attribute '{part}' not found on {type(current).__name__} in path '{path}'")
+                 except Exception as e: # Catch other potential getattr errors
+                     # Use ValueError for unexpected getattr issues
+                     raise ValueError(f"Error accessing attribute '{part}' on {type(current).__name__} in path '{path}': {e}")
+            # --- Si no es dict ni tiene el atributo ---
+            elif current is None: # If traversing yielded None previously
+                raise ValueError(f"Cannot access key/attribute '{part}' in None object in path '{path}'")
+            else:
+                 # Raise AttributeError if it's not a dict and lacks the attr
+                raise AttributeError(f"Key/attribute '{part}' not found in type {type(current).__name__} in path '{path}'")
+        else:
+            # Should not happen with the regex, but safety check
+            raise ValueError(f"Invalid path segment encountered in path '{path}'")
             
-            # Extract each index and add it as a separate part
-            indices = re.findall(r'\[(\d+)\]', part)
-            for idx in indices:
-                path_parts.append(int(idx))
-        else:
-            path_parts.append(part)
-    
-    # Traverse the path
-    for part in path_parts:
-        if isinstance(current, dict):
-            if isinstance(part, str) and part in current:
-                current = current[part]
-            else:
-                raise KeyError(f"Key '{part}' not found in dictionary")
-        elif isinstance(current, (list, tuple)) and isinstance(part, int):
-            if 0 <= part < len(current):
-                current = current[part]
-            else:
-                raise IndexError(f"Index {part} is out of bounds for list of length {len(current)}")
-        else:
-            raise ValueError(f"Cannot access '{part}' in {type(current).__name__}")
-    
     return current
 
 
@@ -133,45 +149,30 @@ def resolve_variables(
 def get_variable_value(variable_path: str, context: Dict[str, Any]) -> Any:
     """
     Extract a value from the context based on a variable path.
-    
-    Args:
-        variable_path: Path to the variable (e.g., "task_name.output_data.field")
-        context: Dictionary containing task outputs and other context
-        
-    Returns:
-        The resolved value
-        
-    Raises:
-        KeyError: If the task or field doesn't exist
-        ValueError: If the variable path is invalid
+    Handles paths like task_id.output_data.field or task_id.output_data.to_dict().field
     """
+    # variable_path is expected to be like "task_id.some.path.here"
     parts = variable_path.split('.', 1)
     
     if len(parts) < 2:
-        raise ValueError(f"Invalid variable path: {variable_path}")
+        # Maybe it's a top-level workflow variable?
+        if variable_path in context: # Check if the whole path is a key in the top-level context
+            return context[variable_path]
+        raise ValueError(f"Invalid variable path format: '{variable_path}'. Expected 'task_id.path' or 'workflow_variable_name'.")
     
-    task_id, field_path = parts
+    task_id, remaining_path = parts
     
     if task_id not in context:
-        raise KeyError(f"Task '{task_id}' not found in context")
+        raise KeyError(f"Task ID '{task_id}' not found in resolution context")
     
-    task_data = context[task_id]
+    task_context_data = context[task_id]
     
-    # Handle special case for output_data as a shortcut to the whole output
-    if field_path == "output_data":
-        return task_data.get("output_data", {})
-    
-    # Otherwise traverse the path
+    # Resolve the remaining path within the task's context data
     try:
-        if field_path.startswith("output_data."):
-            # Strip the output_data prefix and resolve in the task's output_data
-            sub_path = field_path[len("output_data."):]
-            return resolve_path(task_data.get("output_data", {}), sub_path)
-        else:
-            # Resolve in the entire task data
-            return resolve_path(task_data, field_path)
-    except (KeyError, IndexError, ValueError) as e:
-        raise ValueError(f"Failed to resolve '{variable_path}': {str(e)}")
+        # task_context_data could be the TaskOutput object or a dict representation
+        return resolve_path(task_context_data, remaining_path)
+    except (KeyError, IndexError, AttributeError, ValueError, TypeError) as e:
+        raise ValueError(f"Failed to resolve path '{remaining_path}' within task '{task_id}': {type(e).__name__}: {e}")
 
 
 def build_context_from_workflow(workflow_tasks: Dict[str, Any]) -> Dict[str, Any]:
@@ -193,6 +194,4 @@ def build_context_from_workflow(workflow_tasks: Dict[str, Any]) -> Dict[str, Any
             "status": task_data.get("status", "unknown"),
             "output_data": task_data.get("output_data", {}),
         }
-        context[task_id] = task_context
-    
-    return context 
+        context[task_id] = task_context 

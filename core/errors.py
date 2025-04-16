@@ -142,6 +142,9 @@ class ErrorCode:
 
     TASK_EXECUTION_FAILED = "TASK_EXECUTION_FAILED_201"
 
+    # New engine error
+    ENGINE_ERROR = "ENGINE_ERROR"
+
 
 class DawnError(Exception):
     """Base exception class for all framework errors."""  # noqa: D202

@@ -55,3 +55,15 @@ class WriteMarkdownTool:
                 "timestamp": datetime.now().isoformat()
             }
         }
+
+
+def register(tool_registry):
+    """Register the write markdown tool with the tool registry."""
+    tool_registry.register_tool("write_markdown", lambda input_data: {
+        "success": True,
+        "result": WriteMarkdownTool().write_markdown_file(
+            input_data.get("file_path", "output.md"),
+            input_data.get("content", "")
+        )
+    })
+    print("Write markdown tool registered")

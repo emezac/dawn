@@ -93,7 +93,7 @@ def create_task(
     use_file_search=False,
     file_search_vector_store_ids=None,
     file_search_max_results=5,
-    dependencies=None,
+    depends_on=None,
     **kwargs,
 ):
     """
@@ -118,10 +118,10 @@ def create_task(
     )
 
     # Store dependencies as an attribute (though it won't be used by the framework)
-    if dependencies:
-        task.dependencies = dependencies
+    if depends_on:
+        task.depends_on = depends_on
     else:
-        task.dependencies = []
+        task.depends_on = []
 
     return task
 
@@ -493,11 +493,11 @@ def main():
     # Check for DirectHandlerTask dependencies attribute issues
     for task_id, task in workflow.tasks.items():
         if hasattr(task, 'is_direct_handler') and task.is_direct_handler:
-            # Verify no 'dependencies' attribute is mistakenly set
-            if hasattr(task, 'dependencies'):
-                logger.warning(f"Task {task_id} is a DirectHandlerTask but has a 'dependencies' attribute. This is unsupported and will be removed.")
-                # Remove the dependencies attribute to prevent errors
-                delattr(task, 'dependencies')
+            # Verify no 'depends_on' attribute is mistakenly set
+            if hasattr(task, 'depends_on'):
+                logger.warning(f"Task {task_id} is a DirectHandlerTask but has a 'depends_on' attribute. This is unsupported and will be removed.")
+                # Remove the depends_on attribute to prevent errors
+                delattr(task, 'depends_on')
     
     logger.info("\nExecuting compliance check workflow...")
     result = agent.run()

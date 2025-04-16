@@ -697,7 +697,7 @@ def create_task(
     use_file_search=False,
     file_search_vector_store_ids=None,
     file_search_max_results=5,
-    dependencies=None,
+    depends_on=None,
     **kwargs,
 ):
     """
@@ -728,6 +728,7 @@ def create_task(
             next_task_id_on_failure=next_task_id_on_failure,
             max_retries=max_retries,
             parallel=parallel,
+            depends_on=depends_on,
         )
     else:
         # Create a standard task
@@ -745,13 +746,8 @@ def create_task(
             use_file_search=use_file_search,
             file_search_vector_store_ids=file_search_vector_store_ids,
             file_search_max_results=file_search_max_results,
+            depends_on=depends_on,
         )
-
-    # Store dependencies as an attribute (though it won't be used by the framework)
-    if dependencies:
-        task.dependencies = dependencies
-    else:
-        task.dependencies = []
 
     return task
 
@@ -841,10 +837,10 @@ def main() -> Dict[str, Any]:
         for task_id, task in workflow.tasks.items():
             if hasattr(task, 'is_direct_handler') and task.is_direct_handler:
                 # Verify no 'dependencies' attribute is mistakenly set
-                if hasattr(task, 'dependencies'):
-                    logger.warning(f"Task {task_id} is a DirectHandlerTask but has a 'dependencies' attribute. This is unsupported and may cause issues.")
-                    # Remove the dependencies attribute to prevent errors
-                    delattr(task, 'dependencies')
+                if hasattr(task, 'depends_on'):
+                    logger.warning(f"Task {task_id} is a DirectHandlerTask but has a 'depends_on' attribute. This is unsupported and may cause issues.")
+                    # Remove the depends_on attribute to prevent errors
+                    delattr(task, 'depends_on')
 
         # Instantiate the agent
         services = get_services()

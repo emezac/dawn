@@ -21,126 +21,150 @@ import json
 # import traceback
 from core.utils.variable_resolver import resolve_path # Assumed utility
 
-# --- TypedDict for Standardized Task Output ---
-class TaskOutput(TypedDict):
+# --- Standardized Task Output Class ---
+class TaskOutput:
     """
-    Standard structure for the primary output dictionary of a task.
+    Standard structure for the primary output object of a task.
     Defines the mandatory standardized output format.
     """
-    success: bool          # REQUIRED: indicates whether the task execution was successful
-    status: str            # REQUIRED: "completed", "failed", "skipped", "warning"
-    
-    # Only one of the following is required, but both will be set for consistency
-    result: Any            # Primary data output, programmatic use
-    response: Any          # Alias for result, often user-facing or for LLMs
-    
-    # Conditional fields for errors (required when success=False)
-    error: NotRequired[str]              # Human-readable error message
-    error_code: NotRequired[str]         # Machine-friendly error code
-    error_type: NotRequired[str]         # Type of error (e.g., 'ValueError')
-    error_details: NotRequired[Dict[str, Any]]  # Additional structured error info
-    
-    # Optional fields for extra data
-    warning: NotRequired[str]            # Warning message (success=True but with caution)
-    warning_code: NotRequired[str]       # Machine-friendly warning code
-    metadata: NotRequired[Dict[str, Any]]  # Other non-primary results or execution info
+    def __init__(self, 
+                 success: bool, 
+                 status: str,
+                 result: Any = None,
+                 response: Any = None,
+                 error: Optional[str] = None,
+                 error_code: Optional[str] = None,
+                 error_type: Optional[str] = None,
+                 error_details: Optional[Dict[str, Any]] = None,
+                 warning: Optional[str] = None,
+                 warning_code: Optional[str] = None,
+                 metadata: Optional[Dict[str, Any]] = None):
+        
+        self.success = success
+        self.status = status
+        
+        # Handle result/response consistency
+        if result is not None and response is None:
+            self.result = result
+            self.response = result
+        elif response is not None and result is None:
+            self.result = response
+            self.response = response
+        else:
+            self.result = result
+            self.response = response
+            
+        self.error = error
+        self.error_code = error_code
+        self.error_type = error_type
+        self.error_details = error_details or {}
+        
+        self.warning = warning
+        self.warning_code = warning_code
+        self.metadata = metadata or {}
+        
+        # Basic validation
+        valid_statuses = ["completed", "failed", "skipped", "warning"]
+        if self.status not in valid_statuses:
+             raise ValueError(f"Invalid status: {self.status}. Must be one of {valid_statuses}")
+        if not self.success and not self.error:
+             self.error = "Task failed without specific error message."
 
-def validate_output_format(data: Dict[str, Any]) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the TaskOutput object to a dictionary."""
+        # Start with core attributes
+        data = {
+            "success": self.success,
+            "status": self.status,
+            "result": self.result,
+            "response": self.response,
+            "metadata": self.metadata
+        }
+        # Add optional fields only if they have a value
+        if self.error is not None: data["error"] = self.error
+        if self.error_code is not None: data["error_code"] = self.error_code
+        if self.error_type is not None: data["error_type"] = self.error_type
+        if self.error_details: data["error_details"] = self.error_details # Add if not empty
+        if self.warning is not None: data["warning"] = self.warning
+        if self.warning_code is not None: data["warning_code"] = self.warning_code
+        
+        return data
+
+def validate_output_format(data: Dict[str, Any]) -> TaskOutput:
     """
-    Validate and standardize task output data to conform to TaskOutput schema.
+    Validate and standardize task output data, returning a TaskOutput object.
     
     Args:
-        data: The output data to validate and standardize.
+        data: The output data dictionary to validate and standardize.
         
     Returns:
-        A dictionary conforming to the TaskOutput schema.
+        A TaskOutput object representing the standardized output.
     """
-    standardized: Dict[str, Any] = {}
-    
-    # 1. Check and set required fields
-    if "success" not in data:
-        # Infer success from presence of error (backward compatibility)
-        standardized["success"] = "error" not in data
-    else:
-        standardized["success"] = bool(data["success"])
-    
-    # 2. Set status based on success (if not provided)
-    if "status" not in data:
-        if standardized["success"]:
-            standardized["status"] = "completed"
-        else:
-            standardized["status"] = "failed"
-    else:
-        # Validate status values
-        valid_statuses = ["completed", "failed", "skipped", "warning", "success"]
-        status = data["status"]
-        if status not in valid_statuses:
-            # Log a warning and correct the status
-            print(f"Warning: Invalid status '{status}'. Using 'completed' or 'failed' based on success value.")
-            standardized["status"] = "completed" if standardized["success"] else "failed"
-        else:
-            # Map 'success' to 'completed' for backward compatibility
-            if status == "success":
-                standardized["status"] = "completed"
-            else:
-                standardized["status"] = status
-    
-    # 3. Handle result and response fields for consistency
-    if "result" in data:
-        standardized["result"] = data["result"]
-    if "response" in data:
-        standardized["response"] = data["response"]
-    
-    # Ensure consistency between result and response
-    if "result" in standardized and "response" not in standardized:
-        standardized["response"] = standardized["result"]
-    elif "response" in standardized and "result" not in standardized:
-        standardized["result"] = standardized["response"]
-    elif "result" not in standardized and "response" not in standardized:
-        # Both missing but success is true - provide empty values
-        if standardized["success"]:
-            standardized["result"] = None
-            standardized["response"] = None
-    
-    # 4. Handle error fields (required when success=False)
-    if not standardized["success"]:
-        if "error" in data:
-            standardized["error"] = str(data["error"])  # Ensure string
-        else:
-            standardized["error"] = "Task failed without specific error message."
-            
-        # Optional but recommended error fields
-        if "error_code" in data:
-            standardized["error_code"] = str(data["error_code"])
-        if "error_type" in data:
-            standardized["error_type"] = str(data["error_type"])
-        if "error_details" in data:
-            standardized["error_details"] = data["error_details"]
-    
-    # 5. Handle optional warning fields
-    if "warning" in data:
-        standardized["warning"] = str(data["warning"])
-    if "warning_code" in data:
-        standardized["warning_code"] = str(data["warning_code"])
-    
-    # 6. Handle metadata
-    if "metadata" in data:
-        standardized["metadata"] = data["metadata"]
-    else:
-        standardized["metadata"] = {}
-    
-    # 7. Copy any non-standard fields to metadata
-    standard_fields = {
-        "success", "status", "result", "response", "error", "error_code", 
+    # Extract fields with defaults
+    success = data.get("success", "error" not in data) # Infer if missing
+    status = data.get("status")
+    result = data.get("result")
+    response = data.get("response")
+    error = data.get("error")
+    error_code = data.get("error_code")
+    error_type = data.get("error_type")
+    error_details = data.get("error_details")
+    warning = data.get("warning")
+    warning_code = data.get("warning_code")
+    metadata = data.get("metadata", {})
+
+    # Handle status logic
+    valid_statuses = ["completed", "failed", "skipped", "warning", "success"]
+    if status not in valid_statuses:
+        if status is not None:
+             print(f"Warning: Invalid status '{status}'. Inferring from success.")
+        status = "completed" if success else "failed"
+    elif status == "success": # Map legacy status
+         status = "completed"
+
+    # Handle result/response consistency (prefer result if both exist)
+    if result is None and response is not None:
+        result = response
+    elif response is None and result is not None:
+        response = result
+        
+    # Ensure error message exists if failed
+    if not success and error is None:
+        error = "Task failed without specific error message."
+
+    # Collect non-standard keys into metadata
+    standard_keys = {
+        "success", "status", "result", "response", "error", "error_code",
         "error_type", "error_details", "warning", "warning_code", "metadata"
     }
-    
     for key, value in data.items():
-        if key not in standard_fields:
-            if key not in standardized["metadata"]:
-                standardized["metadata"][key] = value
-    
-    return standardized
+        if key not in standard_keys and key not in metadata:
+            metadata[key] = value
+
+    # Create and return the TaskOutput object
+    try:
+        return TaskOutput(
+            success=bool(success),
+            status=str(status),
+            result=result,
+            response=response,
+            error=str(error) if error is not None else None,
+            error_code=str(error_code) if error_code is not None else None,
+            error_type=str(error_type) if error_type is not None else None,
+            error_details=error_details,
+            warning=str(warning) if warning is not None else None,
+            warning_code=str(warning_code) if warning_code is not None else None,
+            metadata=metadata
+        )
+    except ValueError as e: # Catch status validation error from __init__
+         print(f"Error creating TaskOutput object: {e}. Returning basic failure output.")
+         # Fallback to a guaranteed valid failure state
+         return TaskOutput(
+             success=False,
+             status="failed",
+             error=f"Internal error processing task output: {e}",
+             error_code="INTERNAL_OUTPUT_ERROR"
+         )
 
 
 # --- Base Task Class ---
@@ -289,8 +313,10 @@ class Task:
         """
         processed_data: Dict[str, Any] = {}
 
-        # --- Step 1: Ensure data is a dictionary ---
-        if isinstance(data, dict):
+        # --- Step 1: Ensure data is a dictionary --- 
+        if isinstance(data, TaskOutput): # Handle if TaskOutput object is passed directly
+             processed_data = data.to_dict()
+        elif isinstance(data, dict):
             processed_data = data.copy() # Work with a copy
         elif isinstance(data, Exception):
             # If an exception object was returned, format it as an error
@@ -308,22 +334,29 @@ class Task:
             print(f"Warning: Task {self.id} received non-dict output: {type(data)}. Wrapping.")
             processed_data = {"success": True, "result": data, "response": data}
 
-        # --- Step 2: Standardize the output format ---
-        output_data = validate_output_format(processed_data)
+        # --- Step 2: Standardize the output format --- 
+        # validate_output_format now returns a TaskOutput object
+        standardized_output_obj = validate_output_format(processed_data)
         
-        # --- Step 3: Store error information directly on the task for easy access ---
-        if not output_data["success"]:
-            self.error = output_data.get("error", "Unknown error")
-            self.error_details = output_data.get("error_details")
+        # --- Step 3: Store error information directly on the task for easy access --- 
+        # Use attribute access on the TaskOutput object
+        if not standardized_output_obj.success:
+            self.error = standardized_output_obj.error # Use attribute access
+            self.error_details = standardized_output_obj.error_details # Use attribute access
+        else:
+            self.error = None # Clear previous errors on success
+            self.error_details = None
         
-        # --- Step 4: Handle annotations if present ---
-        self.output_annotations = processed_data.get("annotations", [])
+        # --- Step 4: Handle annotations if present --- 
+        # Annotations might be in the original dict or metadata
+        self.output_annotations = processed_data.get("annotations", standardized_output_obj.metadata.get("annotations", []))
         
-        # --- Step 5: Assign the standardized output ---
-        self.output_data = output_data
+        # --- Step 5: Assign the standardized output OBJECT --- 
+        self.output_data = standardized_output_obj # Store the object itself
         
-        # --- Step 6: Update task status based on final output ---
-        self.set_status(output_data["status"])
+        # --- Step 6: Update task status based on final output --- 
+        # Use attribute access on the TaskOutput object
+        self.set_status(standardized_output_obj.status)
 
 
     def get_output_value(self, path: Optional[str] = None, default: Any = None) -> Any:
@@ -338,12 +371,14 @@ class Task:
         Returns:
             The resolved value or the default.
         """
-        if not self.output_data:
-            return default
+        if not isinstance(self.output_data, TaskOutput):
+             # If output_data is not a TaskOutput object (e.g., old format dict), handle gracefully or log error
+             print(f"Warning: output_data for task {self.id} is not a TaskOutput object ({type(self.output_data)}). Returning default.")
+             return default
 
         if not path:
             # Return primary output field if no path specified
-            return self.output_data.get("response", self.output_data.get("result", default))
+            return self.output_data.response if self.output_data.response is not None else self.output_data.result
 
         # Use the path resolver utility - import here if needed
         try:
@@ -353,14 +388,12 @@ class Task:
              return default # Or raise?
 
         try:
-            # Try resolving within the entire output_data dictionary first
-            # This allows accessing metadata, error fields etc. directly (e.g., "metadata.timestamp")
-            return resolve_path(self.output_data, path)
+            # Try resolving within the TaskOutput object's dictionary representation
+            output_dict = self.output_data.to_dict()
+            return resolve_path(output_dict, path)
         except (KeyError, IndexError, TypeError, ValueError):
-            # If direct resolution fails, specifically try resolving within 'response' or 'result'
-            # This handles cases where the path assumes the context is the primary output
-            # e.g., path="items[0].name" should work if output_data['response'] is the list
-            base_data = self.output_data.get("response", self.output_data.get("result"))
+            # If direct resolution fails, specifically try resolving within 'response' or 'result' attributes
+            base_data = self.output_data.response if self.output_data.response is not None else self.output_data.result
             if base_data is not None:
                 try:
                      return resolve_path(base_data, path)
@@ -370,12 +403,13 @@ class Task:
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the task object into a dictionary."""
+        output_data_dict = self.output_data.to_dict() if isinstance(self.output_data, TaskOutput) else self.output_data
         task_dict = {
             "task_id": self.id,
             "name": self.name,
             "status": self.status,
             "input_data": self.input_data,
-            "output_data": self.output_data, # Serializes the standardized output
+            "output_data": output_data_dict, # Use the dict representation
             "is_llm_task": self.is_llm_task,
             "tool_name": self.tool_name,
             "retry_count": self.retry_count,

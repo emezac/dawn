@@ -66,11 +66,11 @@ try:
         use_file_search=False,
         file_search_vector_store_ids=None,
         file_search_max_results=5,
-        dependencies=None,
+        depends_on=None,
         **kwargs,
     ):
         """Patched Task.__init__ method that handles the extra parameters."""
-        print(f"Creating Task with id={task_id}, dependencies={dependencies}")
+        print(f"Creating Task with id={task_id}, depends_on={depends_on}")
 
         # Convert dictionary condition to string if needed
         if isinstance(condition, dict):
@@ -115,10 +115,11 @@ try:
                 use_file_search,
                 file_search_vector_store_ids,
                 file_search_max_results,
+                depends_on,
             )
 
             # Store the additional attributes for reference
-            self.dependencies = dependencies or []
+            self.dependencies = depends_on or []
             self.original_condition = condition  # Store the original condition object/string
             print(f"Task {task_id} created successfully with dependencies {self.dependencies}")
         except Exception as e:
@@ -262,7 +263,7 @@ try:
             task_id="test_task",
             name="Test Task",
             is_llm_task=True,
-            dependencies=["another_task"],
+            depends_on=["another_task"],
             input_data={"prompt": "Test prompt"},
         )
         print(f"Task created successfully: {task}")

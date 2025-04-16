@@ -511,49 +511,49 @@ def build_tourist_route_workflow() -> Workflow:
         task_id="search_route", name="Search Public Transport Route",
         tool_name="web_search",
         input_data={"query": "${build_route_query.result.query}"},
-        dependencies=["build_route_query"],
+        depends_on=["build_route_query"],
         next_task_id_on_success="extract_route_steps"  # Add explicit next task
     )
     task_search_rideshare = Task(
         task_id="search_rideshare", name="Check Rideshare Availability",
         tool_name="web_search",
         input_data={"query": "${build_rideshare_query.result.query}"},
-        dependencies=["build_rideshare_query"],
+        depends_on=["build_rideshare_query"],
         next_task_id_on_success="extract_availability"  # Add explicit next task
     )
     task_search_autonomous = Task(
         task_id="search_autonomous", name="Check Autonomous Availability",
         tool_name="web_search",
         input_data={"query": "${build_autonomous_query.result.query}"},
-        dependencies=["build_autonomous_query"],
+        depends_on=["build_autonomous_query"],
         next_task_id_on_success="extract_availability"  # Add explicit next task
     )
     task_search_fare_metro = Task(
         task_id="search_fare_metro", name="Search Metro Fare",
         tool_name="web_search",
         input_data={"query": "${build_fare_query_metro.result.query}"},
-        dependencies=["build_fare_query_metro"],
+        depends_on=["build_fare_query_metro"],
         next_task_id_on_success="extract_fares"  # Add explicit next task
     )
     task_search_fare_bus = Task(
         task_id="search_fare_bus", name="Search Bus Fare",
         tool_name="web_search",
         input_data={"query": "${build_fare_query_bus.result.query}"},
-        dependencies=["build_fare_query_bus"],
+        depends_on=["build_fare_query_bus"],
         next_task_id_on_success="extract_fares"  # Add explicit next task
     )
     task_search_fare_metrobus = Task(
         task_id="search_fare_metrobus", name="Search Metrobus Fare",
         tool_name="web_search",
         input_data={"query": "${build_fare_query_metrobus.result.query}"},
-        dependencies=["build_fare_query_metrobus"],
+        depends_on=["build_fare_query_metrobus"],
         next_task_id_on_success="extract_fares"
     )
     task_search_fare_suburbano = Task(
         task_id="search_fare_suburbano", name="Search Suburban Train Fare",
         tool_name="web_search",
         input_data={"query": "${build_fare_query_suburbano.result.query}"},
-        dependencies=["build_fare_query_suburbano"],
+        depends_on=["build_fare_query_suburbano"],
         next_task_id_on_success="extract_fares"
     )
 
@@ -604,7 +604,7 @@ def build_tourist_route_workflow() -> Workflow:
             Si no puedes determinar los pasos, proporciona al menos una estimación básica de la ruta completa.
             """
         },
-        dependencies=["search_route"],
+        depends_on=["search_route"],
         next_task_id_on_success="calculate_cost"
     )
     task_extract_availability = Task(
@@ -631,7 +631,7 @@ def build_tourist_route_workflow() -> Workflow:
             ```
             """
         },
-        dependencies=["search_rideshare", "search_autonomous"],
+        depends_on=["search_rideshare", "search_autonomous"],
         next_task_id_on_success="synthesize_report"  # Add explicit next task
     )
     task_extract_fares = Task(
@@ -687,7 +687,7 @@ def build_tourist_route_workflow() -> Workflow:
             Si encuentras otros modos relevantes, añádelos al JSON. Si no encuentras alguno, usa `null` o elimina esa clave.
             """
         },
-        dependencies=["search_fare_metro", "search_fare_bus", "search_fare_metrobus", "search_fare_suburbano"],
+        depends_on=["search_fare_metro", "search_fare_bus", "search_fare_metrobus", "search_fare_suburbano"],
         next_task_id_on_success="calculate_cost"
     )
 
@@ -699,7 +699,7 @@ def build_tourist_route_workflow() -> Workflow:
             "route_steps": "${extract_route_steps.result.result | []}",
             "fare_data": "${extract_fares.result.result | {}}"
         },
-        dependencies=["extract_route_steps", "extract_fares"],
+        depends_on=["extract_route_steps", "extract_fares"],
         next_task_id_on_success="synthesize_report"  # Add explicit next task
     )
 
@@ -710,69 +710,26 @@ def build_tourist_route_workflow() -> Workflow:
         input_data={
             "route_steps": "${extract_route_steps.result.result | []}"
         },
-        dependencies=["extract_route_steps"],
+        depends_on=["extract_route_steps"],
         next_task_id_on_success="synthesize_report"
     )
 
-    # --- Tarea de Síntesis Final y Generación de Informe (LLM) ---
-    task_synthesize_report = Task(
-        task_id="synthesize_report", name="Synthesize Final Report",
-        is_llm_task=True,
+    # --- Tarea Final: Generar el Reporte Completo & Visualización (Depende de todo) ---
+    task_synthesize_report = DirectHandlerTask(
+        task_id="synthesize_report", name="Synthesize Final Report & Maps",
+        handler_name="synthesize_full_report_handler",
         input_data={
-            "prompt": """
-            Eres un asistente de planificación de rutas para turistas. Genera un informe detallado en formato MARKDOWN para la ruta más económica desde '${start_location}' hasta '${end_location}' en '${city}'.
-
-            Utiliza la siguiente información recopilada:
-            - Pasos de la Ruta: ${extract_route_steps.result.result | 'No se encontraron pasos.'}
-            - Disponibilidad de Servicios: ${extract_availability.result.result | 'No se encontró información.'}
-            - Desglose de Costos por Paso: ${calculate_cost.result.cost_breakdown | 'No disponible.'}
-            - Costo Total Estimado: ${calculate_cost.result.total_cost | 'No disponible'} MXN
-            - Tiempo Total Estimado: ${calculate_cost.result.time_formatted | 'No disponible'}
-            - Modos con Tarifa Desconocida: ${calculate_cost.result.unknown_fare_modes | []}
-            
-            El informe DEBE incluir las siguientes secciones EXACTAS con formato Markdown:
-
-            ## Ruta Detallada (Transporte Público)
-            *Lista numerada de los pasos extraídos.*
-            *Si no se encontraron pasos, indica: "No se pudo determinar una ruta detallada de transporte público."*
-
-            ## Tiempos y Costos Estimados
-            *Crea una tabla Markdown con columnas: | Paso | Modo de Transporte | Tiempo Est. | Costo Est. |*
-            *Llena la tabla con la información de 'Desglose de Costos por Paso'.*
-            *Si el desglose no está disponible, indica: "No se pudo generar el desglose de costos."*
-            *Si hubo modos con tarifa desconocida, añade una nota al final de la tabla mencionándolos.*
-
-            ## Resumen de la Ruta
-            - **Tiempo Total Estimado:** ${calculate_cost.result.time_formatted | 'No disponible'}
-            - **Costo Total Estimado:** ${calculate_cost.result.total_cost | 'No disponible'} MXN
-            *Añade una recomendación sobre la mejor hora del día para este viaje (evitar horas pico, etc.).*
-
-            ## Otros Servicios de Transporte en ${city}
-            - **Apps (Uber/Didi):** *Indica la disponibilidad extraída.*
-            - **Vehículos Autónomos:** *Indica la disponibilidad extraída.*
-            *Menciona brevemente la posibilidad de usar rutas híbridas (ej. metro + Uber para el último tramo) si las apps están disponibles.*
-
-            ## Mapa de la Ruta
-
-            ![Mapa de Ruta](examples/ruta_aifa_azteca_mapa.png)
-
-            **Para una visualización interactiva completa, abra el archivo:** examples/ruta_aifa_azteca_mapa.html
-
-            *Mapa pre-generado para ruta AIFA-Estadio Azteca.*
-
-            ## Flujo de la Ruta (Resumen)
-            *Describe la secuencia principal de modos de transporte, los puntos clave y tiempos en una línea. Ejemplo: AIFA -(Autobús Z, 25min, $A)-> Indios Verdes -(Metro L3, 30min, $B)-> Estadio Azteca.*
-            *Si no hay pasos detallados, indica: "No disponible."*
-
-            ## Descargo de Responsabilidad
-            *Incluye este texto:* "Nota: La información de rutas, tiempos y costos se basa en búsquedas web públicas y puede no ser exacta o estar desactualizada. Las tarifas y tiempos son estimados y pueden variar. No se consideran posibles retrasos ni tráfico. Verifica siempre la información localmente antes de viajar."
-
-            --- FIN DEL INFORME ---
-
-            Genera ÚNICAMENTE el contenido Markdown del informe. No incluyas explicaciones adicionales antes o después.
-            """
+            "city": "${city}",
+            "start_location": "${start_location}",
+            "end_location": "${end_location}",
+            "route_steps": "${extract_route_steps.result.result | []}",
+            "total_cost": "${calculate_cost.result.total_cost | 'Desconocido'}",
+            "availability": "${extract_availability.result.result | {}}",
+            "transportation_costs": "${extract_fares.result.result | {}}",
+            "travel_time": "${calculate_cost.result.total_time_minutes | 0}",
+            "map_images": []
         },
-        dependencies=[
+        depends_on=[
             "extract_route_steps",
             "extract_availability",
             "calculate_cost",
@@ -789,7 +746,7 @@ def build_tourist_route_workflow() -> Workflow:
             "file_path": "examples/ruta_aifa_azteca.md",
             "content": "${synthesize_report.result}"  # Changed from result.response to just result
         },
-        dependencies=["synthesize_report"]
+        depends_on=["synthesize_report"]
     )
 
     # Add all tasks to the workflow

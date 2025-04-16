@@ -267,6 +267,11 @@ class ChatPlannerConfig:
         return ChatPlannerConfig.get("max_clarifications", 3)
     
     @staticmethod
+    def mock_get_max_clarifications() -> int:
+        """Mock function for testing that returns a fixed value."""
+        return 3
+    
+    @staticmethod
     def is_plan_validation_enabled() -> bool:
         """Check if plan validation is enabled."""
         return ChatPlannerConfig.get("enable_plan_validation", True)

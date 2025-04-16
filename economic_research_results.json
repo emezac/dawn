@@ -1,0 +1,82 @@
+{
+  "success": false,
+  "workflow_id": "economic_research_workflow",
+  "workflow_name": "Economic Research Workflow",
+  "status": "failed",
+  "final_output": {
+    "success": false,
+    "status": "failed",
+    "result": null,
+    "response": null,
+    "metadata": {},
+    "error": "Error executing task: No module named 'web'",
+    "error_code": "TASK_EXECUTION_ERROR",
+    "error_type": "ModuleNotFoundError",
+    "error_details": {
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/admin/code/newstart/dawn/core/engine.py\", line 558, in execute_task\n    raw_output = handler(task, resolved_input)\n  File \"/Users/admin/code/newstart/dawn/examples/economic_impact_researcher.py\", line 910, in custom_full_research_handler\n    from web import run as web_run\nModuleNotFoundError: No module named 'web'\n"
+    }
+  },
+  "tasks": {
+    "full_research": {
+      "task_id": "full_research",
+      "name": "Full Economic Research",
+      "status": "failed",
+      "input_data": {
+        "user_request": "\nInvestiga a fondo el impacto econ\u00f3mico global de las tarifas impuestas por la administraci\u00f3n Trump.\nEnf\u00f3cate en los siguientes aspectos:\n1.  Identifica los principales pa\u00edses afectados (positiva o negativamente).\n2.  Resume el impacto espec\u00edfico por pa\u00eds identificado (ej. cambios en PIB, exportaciones/importaciones, empleo en sectores clave).\n3.  Analiza las implicaciones geopol\u00edticas generales de estas tarifas (ej. relaciones comerciales, alianzas, tensiones globales).\n\nHerramientas disponibles para usar:\n- Usa web_search o research_tool para buscar informaci\u00f3n en internet\n- Usa analyze_text para analizar los resultados de b\u00fasqueda\n- Usa write_markdown para escribir el informe final\n\nRequerimientos de Salida:\n-   Genera un informe final en formato Markdown usando la herramienta write_markdown.\n-   Incluye una tabla bien organizada que resuma el impacto por pa\u00eds (Columnas: Pa\u00eds, Sector Afectado, Impacto Resumido).\n-   Proporciona una secci\u00f3n separada con el an\u00e1lisis geopol\u00edtico.\n-   Utiliza fuentes de informaci\u00f3n actuales y confiables (noticias recientes, reportes econ\u00f3micos).\n-   El informe debe guardarse en un archivo llamado 'informe_tarifas_trump.md'.\n"
+      },
+      "output_data": {
+        "success": false,
+        "status": "failed",
+        "result": null,
+        "response": null,
+        "metadata": {},
+        "error": "Error executing task: No module named 'web'",
+        "error_code": "TASK_EXECUTION_ERROR",
+        "error_type": "ModuleNotFoundError",
+        "error_details": {
+          "traceback": "Traceback (most recent call last):\n  File \"/Users/admin/code/newstart/dawn/core/engine.py\", line 558, in execute_task\n    raw_output = handler(task, resolved_input)\n  File \"/Users/admin/code/newstart/dawn/examples/economic_impact_researcher.py\", line 910, in custom_full_research_handler\n    from web import run as web_run\nModuleNotFoundError: No module named 'web'\n"
+        }
+      },
+      "is_llm_task": false,
+      "retry_count": 0,
+      "max_retries": 0,
+      "parallel": false,
+      "use_file_search": false,
+      "file_search_max_results": 5,
+      "error": "Error executing task: No module named 'web'",
+      "error_details": {
+        "traceback": "Traceback (most recent call last):\n  File \"/Users/admin/code/newstart/dawn/core/engine.py\", line 558, in execute_task\n    raw_output = handler(task, resolved_input)\n  File \"/Users/admin/code/newstart/dawn/examples/economic_impact_researcher.py\", line 910, in custom_full_research_handler\n    from web import run as web_run\nModuleNotFoundError: No module named 'web'\n"
+      },
+      "validate_input": false,
+      "validate_output": false,
+      "task_type": "direct_handler",
+      "handler_name": "custom_full_research_handler",
+      "is_direct_handler": true
+    }
+  },
+  "error_summary": {
+    "workflow_id": "economic_research_workflow",
+    "error_count": 1,
+    "has_errors": true,
+    "tasks_with_errors": [
+      "full_research"
+    ],
+    "propagation_count": 0,
+    "latest_error": {
+      "success": false,
+      "status": "failed",
+      "result": null,
+      "response": null,
+      "metadata": {},
+      "error": "Error executing task: No module named 'web'",
+      "error_code": "TASK_EXECUTION_ERROR",
+      "error_type": "ModuleNotFoundError",
+      "error_details": {
+        "traceback": "Traceback (most recent call last):\n  File \"/Users/admin/code/newstart/dawn/core/engine.py\", line 558, in execute_task\n    raw_output = handler(task, resolved_input)\n  File \"/Users/admin/code/newstart/dawn/examples/economic_impact_researcher.py\", line 910, in custom_full_research_handler\n    from web import run as web_run\nModuleNotFoundError: No module named 'web'\n"
+      },
+      "timestamp": "2025-04-16T17:09:13.394658"
+    }
+  },
+  "workflow_error": "Task 'full_research' failed permanently.",
+  "failed_task_id": "full_research"
+}
