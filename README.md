@@ -9,6 +9,7 @@ The AI Agent Framework is designed to enhance the capabilities of AI agents, all
 - **Visualization of Workflow Execution**: Generate visual representations of workflows to aid in understanding and debugging.
 - **Vector Store ID Validation**: Robust utilities for validating OpenAI Vector Store IDs with different validation levels.
 - **Error Propagation Between Tasks**: Comprehensive error tracking and propagation system allowing downstream tasks to access and handle errors from upstream tasks.
+- **Dynamic Data Analysis Workflows**: New example workflows for dynamic search, analysis, and report generation on any topic.
 - **DirectHandlerTask Support:**
   - Register and use handler functions directly in workflows without needing global tool registry.
   - Improved task output and variable resolution for complex data structures.
@@ -21,6 +22,16 @@ The AI Agent Framework is designed to enhance the capabilities of AI agents, all
   - Type-safe access to shared services like ToolRegistry and LLMInterface
   - Proper dependency injection support throughout the framework
   - Simplified management of service lifecycle and configuration
+
+## Example Workflows
+
+The framework includes several example workflows demonstrating different capabilities:
+
+- **[Trump Tariff Analyzer](docs/example_workflows.md#trump-tariff-analyzer-examplestrump_tariff_analyzerpy)**: A specialized workflow that analyzes the impact of Trump's tariff policies on global trade.
+- **[Dynamic Input Query Analyzer](docs/example_workflows.md#dynamic-input-query-analyzer-examplesdynamic_input_query_flowpy)**: A versatile workflow that accepts any user query, retrieves information, analyzes it, and generates an executive report.
+- **[Chat Planner](docs/example_workflows.md#chat-planner-exampleschat_planner_workflowpy)**: An advanced workflow that uses LLM-based planning to dynamically create and execute task sequences.
+
+For more details and additional examples, see the [Example Workflows documentation](docs/example_workflows.md).
 
 ## Installation and Dependencies
 

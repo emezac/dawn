@@ -41,6 +41,7 @@ Any other relevant information
 
 - [Graphviz Dependency Fix](graphviz_dependency_fix.md) - Documents how to handle optional graphviz dependency, making the visualization features gracefully degrade when the dependency is missing.
 - [Nested JSON in Plan Validation Fix](nested_json_in_plan_validation_fix.md) - Fix for handling nested JSON structures in plan validation that caused schema validation errors.
+- [Mock Data Implementation](mock_data_implementation.md) - Best practices for implementing mock data fallbacks in workflows when external services fail.
 
 ## Contributing
 
@@ -91,6 +92,11 @@ When fixing significant issues in the framework:
 - **Affected Files**: examples/smart_compliance_workflow.py, run_example.sh
 - **Problem**: Custom tool execution and task failures in the smart compliance workflow
 - **Solution**: WorkflowEngine patching and DirectHandlerTask implementation for custom tool execution
+
+### Mock Data Implementation
+- **File**: [mock_data_implementation.md](mock_data_implementation.md)
+- **Problem**: Inconsistent implementation of mock data fallbacks in workflows
+- **Solution**: Standardized patterns for mock data implementation with explicit control, graceful fallbacks, and separated mock data definitions
 
 ## Using These Solutions
 

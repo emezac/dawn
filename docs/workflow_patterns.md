@@ -441,4 +441,101 @@ workflow.add_task(cancel_task)
 
 - [Error Propagation](error_propagation.md)
 - [Error Codes Reference](error_codes_reference.md)
-- [Example Workflows](../examples) 
+- [Example Workflows](../examples)
+
+## Dynamic Analysis Pattern
+
+This pattern implements a workflow that dynamically generates and executes an analysis plan based on user input, allowing for flexible information gathering, analysis, and reporting. It combines planning, clarification, and execution phases to provide comprehensive insights on complex topics.
+
+### Structure of a Dynamic Analysis Workflow
+
+The Dynamic Analysis pattern consists of several distinct phases:
+
+1. **Capability Discovery**: Identifies available tools and handlers for use in the planning phase
+2. **Planning**: Generates a custom execution plan based on the user's request and available capabilities
+3. **Clarification Loop**: Checks if additional information is needed from the user and processes responses
+4. **Plan Validation**: Ensures the generated plan is executable with available components
+5. **Task Generation**: Converts the plan into concrete executable tasks
+6. **Dynamic Execution**: Executes the generated tasks in the proper order
+7. **Result Summarization**: Aggregates and formats the results for presentation
+
+### Example: Trump Tariff Analyzer
+
+The Trump Tariff Analyzer workflow in `examples/trump_tariff_analyzer.py` is a concrete implementation of the Dynamic Analysis pattern focused on analyzing Trump's tariff policies.
+
+```python
+workflow = Workflow(
+    workflow_id="trump_tariff_analyzer",
+    name="Trump Tariff Policy Analyzer"
+)
+
+# Phase 1: Get Capabilities
+get_capabilities_task = Task(
+    task_id="get_capabilities",
+    name="Get Available Tools and Handlers",
+    tool_name="get_available_capabilities",
+    input_data={},
+    next_task_id_on_success="think_analyze_plan"
+)
+workflow.add_task(get_capabilities_task)
+
+# Phase 2: Planning
+plan_task = DirectHandlerTask(
+    task_id="think_analyze_plan",
+    name="Generate Trump Tariff Analysis Plan",
+    handler_name="plan_user_request_handler",
+    input_data={
+        "user_request": "${user_query}",
+        "available_tools_context": "${get_capabilities.result.tools_context}",
+        "available_handlers_context": "${get_capabilities.result.handlers_context}",
+        "clarification_history": "${clarification_history:[]}",
+        "clarification_count": "${clarification_count:0}",
+        "skip_ambiguity_check": "${skip_ambiguity_check:False}"
+    },
+    next_task_id_on_success="check_for_clarification_needed"
+)
+# ... additional phases including clarification, validation, execution, and summarization
+
+# Phase 7: Result Summarization
+summarize_task = DirectHandlerTask(
+    task_id="summarize_results",
+    name="Summarize Trump Tariff Analysis Results",
+    handler_name="summarize_results_handler",
+    input_data={
+        "execution_results": "${execute_dynamic_tasks.result}",
+        "original_plan": "${validate_plan.result.validated_plan}",
+        "original_input": "${user_query}"
+    },
+    next_task_id_on_success=None
+)
+workflow.add_task(summarize_task)
+```
+
+### Key Components of Dynamic Analysis
+
+The Trump Tariff Analyzer implementation includes specialized components:
+
+1. **Enhanced Search Tool**: `trump_tariff_search_tool` that enriches queries with relevant context
+2. **Domain-Specific Analysis**: `analyze_trump_tariff_handler` for extracting insights about affected countries and sectors
+3. **Structured Report Generation**: `generate_trump_tariff_report_handler` creates formatted Markdown reports
+4. **Fallback Mechanisms**: Provides mock data when web searches fail
+5. **Variable Resolution**: Utilizes Dawn's variable resolution system with `${variable}` syntax
+6. **Error Propagation**: Implements error handling across task transitions
+
+### Benefits of the Dynamic Analysis Pattern
+
+- **Adaptability**: Handles a wide range of user queries without predefined workflow paths
+- **Flexibility**: Can incorporate new data sources and analysis methods without restructuring
+- **Robustness**: Includes fallback mechanisms and error handling for reliable execution
+- **User Interaction**: Supports clarification loops when more information is needed
+- **Reusability**: Core components can be reused across different domain-specific analyzers
+
+### When to Use Dynamic Analysis
+
+This pattern is ideal when:
+- The specific analysis steps cannot be fully determined in advance
+- User queries can vary widely in focus and scope
+- Multiple data sources and analysis methods may be needed
+- The workflow needs to adapt based on intermediate results
+
+For more details, see the complete implementation in `examples/trump_tariff_analyzer.py` and usage documentation in `docs/example_workflows.md`. 
