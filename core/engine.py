@@ -538,6 +538,13 @@ class WorkflowEngine:
             self.error_context = ErrorContext(workflow_id=workflow.id) # Reset error context too
             log_info(f"WorkflowEngine switched to execute new workflow '{workflow.name}' (ID: {workflow.id})")
         return self.run(initial_input=initial_input)
+    
+    # Add to your WorkflowEngine.run method or create a wrapper
+    def debug_after_task(task_id, workflow):
+        if DEBUG_HANDLERS:
+            print(f"\n--- DEBUG: After task '{task_id}' ---")
+            print(f"Workflow variables: {workflow.variables}")
+            print("-----------------------------------\n")
         
     def execute_task(self, task):
         """
