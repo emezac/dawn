@@ -594,3 +594,90 @@ The project includes comprehensive documentation:
   - [File Purpose Parameters](docs/openai_file_purpose_parameters.md)
   - [API Parameter Changes](docs/openai_api_parameter_changes.md) (including Beta API header format)
 - **Fixes and Enhancements**: Documentation of known issues and their solutions in the `fixes` directory.
+
+# Real Estate Advisor Workflow
+
+This example demonstrates a comprehensive workflow for analyzing real estate properties and providing investment advice, implemented using the Dawn workflow framework.
+
+## Workflow Overview
+
+The Real Estate Advisor workflow follows these steps:
+
+1. **Get User Input**: Collects user criteria for property search including location, price range, and number of bedrooms.
+2. **Search Properties**: Searches the web for properties matching the user's criteria.
+3. **Search Market Data**: Gathers market analysis data for the specified location.
+4. **Analyze Findings**: Combines property search results and market data to analyze investment potential.
+5. **Generate Report**: Creates a comprehensive report with all findings and recommendations.
+6. **Complete Workflow**: Saves the report as a markdown file for the user.
+
+## Key Components
+
+- **get_user_input_handler**: Processes natural language input from the user and extracts structured search criteria.
+- **web_search_handler**: Searches the web for property listings and market data.
+- **analyze_data_handler**: Analyzes the property and market data against user criteria.
+- **generate_real_estate_report_handler**: Formats all collected data into a comprehensive report.
+
+## How to Run
+
+### Prerequisites
+
+- Python 3.8 or higher
+- Dawn framework installed
+- OpenAI API key (set as OPENAI_API_KEY environment variable)
+
+### Running the Workflow
+
+```bash
+# Regular execution
+python examples/real_estate_advisor_flow.py
+
+# With debug logging
+python examples/real_estate_advisor_flow.py --debug
+
+# Generate a visualization of the workflow
+python examples/real_estate_advisor_flow.py --visualize
+```
+
+### Command Line Arguments
+
+- `--visualize`: Generate a visualization of the workflow instead of executing it
+- `--output [FILENAME]`: Specify the output file for the visualization (default: real_estate_advisor_flow.png)
+- `--debug`: Enable detailed debug logging
+
+## Example Input
+
+When prompted, you can provide input such as:
+
+```
+looking for 3 bedroom properties in Madrid under 500,000€
+```
+
+The workflow will extract the location (Madrid), price range (under 500,000€), and bedrooms (3) from this query.
+
+## Output
+
+The workflow generates a markdown report containing:
+
+1. User search criteria
+2. Property search results
+3. Market data analysis
+4. Expert analysis and recommendations
+
+The report is saved to a file with a name that includes the location and timestamp, e.g., `real_estate_report_madrid_20250417_225511.md`.
+
+## Extending the Workflow
+
+To extend this workflow:
+
+1. Add new handlers to process additional types of data
+2. Modify the `build_real_estate_advisor_workflow` function to include additional tasks
+3. Update the report generation to include your new data and analysis
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Make sure your OPENAI_API_KEY is set correctly
+2. Run with the `--debug` flag to see detailed logs
+3. Check that all required Dawn framework components are available
+4. Ensure network connectivity for the web search functionality

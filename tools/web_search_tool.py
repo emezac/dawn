@@ -18,12 +18,13 @@ class WebSearchTool:
 
         if user_location:
             tools_config[0]["user_location"] = user_location
+            print(f"Using user location: {user_location}")
 
         try:
             response = self.client.responses.create(
                 model="gpt-4o-2024-08-06",
                 input=query,
-                tools=[{"type": "web_search_preview", "search_context_size": context_size}],
+                tools=tools_config,
                 timeout=30,  # timeout after 30 seconds
             )
 

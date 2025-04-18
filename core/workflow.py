@@ -196,3 +196,9 @@ class Workflow:
         for task in self.tasks.values():
             if hasattr(task, 'set_tool_registry'):
                 task.set_tool_registry(tool_registry)
+
+    def get_tasks(self):
+        """
+        Returns the list of Task objects in the order they were added.
+        """
+        return [self.tasks[task_id] for task_id in self.task_order]
