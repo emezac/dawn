@@ -1,0 +1,20 @@
+{
+  "servers": {
+    "MCP-timeserver": {
+      "url": "http://localhost:8080",
+      "api_key": "dawn-mcp-demo-key",
+      "timeout": 30,
+      "max_retries": 3,
+      "retry_delay": 1.0
+    }
+  },
+  "default_server": "MCP-timeserver",
+  "log_level": "INFO",
+  "max_connections": 5,
+  "mcpServers": {
+    "MCP-timeserver": {
+      "command": "python",
+      "args": ["simple_mcp_time_server.py", "--time-port", "3737"]
+    }
+  }
+} 

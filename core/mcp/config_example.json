@@ -1,0 +1,21 @@
+{
+  "servers": {
+    "main": {
+      "url": "http://localhost:8080",
+      "api_key": "your_api_key_here",
+      "timeout": 30,
+      "max_retries": 3,
+      "retry_delay": 1.5
+    },
+    "development": {
+      "url": "http://localhost:9000",
+      "api_key": null,
+      "timeout": 60,
+      "max_retries": 5,
+      "retry_delay": 2.0
+    }
+  },
+  "default_server": "main",
+  "log_level": "INFO",
+  "max_connections": 5
+} 
